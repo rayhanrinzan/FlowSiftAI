@@ -64,15 +64,21 @@ def _render_rows(rows: tuple[RankedOpportunity, ...]) -> None:
                     )
                     market.markdown(
                         status_badge_html(
-                            row.market_check_label,
-                            row.market_check_tone,
+                            getattr(row, "market_check_label", "Market check required"),
+                            getattr(row, "market_check_tone", "warn"),
                         ),
                         unsafe_allow_html=True,
                     )
                     st.markdown("**What this means**")
-                    st.write(row.problem_summary)
+                    st.write(getattr(row, "problem_summary", row.title))
                     st.markdown("**Product to test**")
-                    st.write(row.product_hypothesis)
+                    st.write(
+                        getattr(
+                            row,
+                            "product_hypothesis",
+                            "Open the product brief to review the recommended MVP and validation plan.",
+                        )
+                    )
                     left, right = st.columns(2)
                     left.markdown(
                         score_bar_html("Problem", row.problem_score),
