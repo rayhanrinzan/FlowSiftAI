@@ -292,7 +292,9 @@ def test_scout_rejects_real_but_off_workflow_discussions(
                 ),
                 snippet=(
                     "I run an ecommerce store and customer data breaches are "
-                    "frustrating. Compliance work feels manual and expensive."
+                    "frustrating. Compliance work feels manual and expensive. "
+                    + ("unrelated page chrome " * 100)
+                    + "Related post: manual order tracking emails take hours."
                 ),
                 score=0.93,
             ),

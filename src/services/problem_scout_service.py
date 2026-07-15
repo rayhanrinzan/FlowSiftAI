@@ -499,7 +499,7 @@ def _matches_segment(
 def _matches_workflow(evidence: WebEvidenceCandidate, topic: str) -> bool:
     """Require a result to mention multiple terms from the searched workflow."""
 
-    text = " ".join((evidence.title, evidence.snippet)).lower()
+    text = " ".join((evidence.title, evidence.snippet[:1_200])).lower()
     text_terms = {
         token[:-1] if token.endswith("s") and len(token) > 4 else token
         for token in re.findall(r"[a-z0-9]+", text)
@@ -509,7 +509,17 @@ def _matches_workflow(evidence: WebEvidenceCandidate, topic: str) -> bool:
         for token in re.findall(r"[a-z0-9]+", topic.lower())
         if len(token) >= 4 and token not in GENERIC_WORKFLOW_TERMS
     }
-    return len(topic_terms & text_terms) >= min(2, len(topic_terms))
+    required_matches = min(2, len(topic_terms))
+    if len(topic_terms & text_terms) < required_matches:
+        return False
+    for passage in re.split(r"(?<=[.!?])\s+", text):
+        passage_terms = {
+            token[:-1] if token.endswith("s") and len(token) > 4 else token
+            for token in re.findall(r"[a-z0-9]+", passage)
+        }
+        if len(topic_terms & passage_terms) >= required_matches:
+            return True
+    return False
 
 
 def _contains_first_hand_problem(evidence: WebEvidenceCandidate) -> bool:
