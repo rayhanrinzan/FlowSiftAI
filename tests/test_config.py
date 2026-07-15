@@ -38,7 +38,7 @@ def test_env_update_preserves_unmodified_secret(tmp_path: Path) -> None:
         {
             "DEMO_MODE": False,
             "LLM_MODEL": "gpt-test",
-            "REDDIT_USER_AGENT": "InSift/1.0 by test-user",
+            "REDDIT_USER_AGENT": "FlowSiftAI/1.0 by test-user",
         },
         env_path=env_path,
     )
@@ -48,7 +48,7 @@ def test_env_update_preserves_unmodified_secret(tmp_path: Path) -> None:
     assert "LLM_API_KEY=keep-me" in result
     assert "DEMO_MODE=false" in result
     assert "LLM_MODEL=gpt-test" in result
-    assert 'REDDIT_USER_AGENT="InSift/1.0 by test-user"' in result
+    assert 'REDDIT_USER_AGENT="FlowSiftAI/1.0 by test-user"' in result
 
 
 def test_env_update_rejects_multiline_values(tmp_path: Path) -> None:

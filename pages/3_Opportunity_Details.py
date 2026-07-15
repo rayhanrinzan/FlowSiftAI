@@ -26,13 +26,17 @@ from src.services.correction_service import build_correction_service
 from src.services.research_service import build_research_service
 from src.ui.components import (
     configure_page,
+    empty_state,
+    fact_block_html,
     page_header,
     page_size_control,
     paginate_items,
     render_database_error,
     render_flash,
     render_pagination,
+    score_bar_html,
     score_tone,
+    section_header,
     set_flash,
     status_badge_html,
 )
@@ -117,31 +121,52 @@ def _render_overview(
     st.write(cluster.problem_summary)
 
     target, workaround, solution = st.columns(3)
-    target.markdown(f"**Target user**  \n{cluster.target_customer or 'Unknown'}")
+    target.markdown(
+        fact_block_html("Target user", cluster.target_customer, "Not established"),
+        unsafe_allow_html=True,
+    )
     workaround.markdown(
-        f"**Current workaround**  \n{cluster.current_workaround or 'Not established'}"
+        fact_block_html(
+            "Current workaround", cluster.current_workaround, "Not established"
+        ),
+        unsafe_allow_html=True,
     )
     solution.markdown(
-        f"**Proposed MVP**  \n{cluster.proposed_solution or 'Not generated'}"
+        fact_block_html("Proposed MVP", cluster.proposed_solution, "Not generated"),
+        unsafe_allow_html=True,
     )
 
-    st.subheader("Scorecard")
+    section_header("Scorecard", "Quality and confidence are evaluated separately.")
     if score is None:
-        st.info("This opportunity has not been scored yet.")
+        empty_state(
+            "No score available",
+            "Recompute scores after linking evidence to this opportunity.",
+        )
     else:
         problem, whitespace, opportunity, confidence = st.columns(4)
-        problem.metric("Problem Score", format_score(_problem_score(score)))
-        whitespace.metric("White-Space", format_score(score.whitespace_score))
-        opportunity.metric("Opportunity Score", format_score(score.opportunity_score))
-        confidence.metric("Confidence", format_score(score.confidence_score))
+        problem.markdown(
+            score_bar_html("Problem", _problem_score(score)), unsafe_allow_html=True
+        )
+        whitespace.markdown(
+            score_bar_html("Market gap", score.whitespace_score),
+            unsafe_allow_html=True,
+        )
+        opportunity.markdown(
+            score_bar_html("Opportunity", score.opportunity_score),
+            unsafe_allow_html=True,
+        )
+        confidence.markdown(
+            score_bar_html("Confidence", score.confidence_score),
+            unsafe_allow_html=True,
+        )
         if score.opportunity_score >= 65 and score.confidence_score < 50:
             st.warning(
                 "The score is promising, but confidence is limited. Add independent "
                 "evidence before treating the ranking as reliable."
             )
 
-    st.subheader("Decision risks")
-    st.write(
+    section_header("Decision risks")
+    st.info(
         "Evidence coverage, search coverage, classification confidence, build feasibility, "
         "and customer access still require human validation."
     )
@@ -162,7 +187,10 @@ def _render_evidence(cluster: OpportunityCluster) -> None:
         f"{format_datetime(cluster.last_seen_at)}"
     )
     if not links:
-        st.info("This opportunity has no linked evidence.")
+        empty_state(
+            "No linked evidence",
+            "This opportunity needs source evidence before it can be validated.",
+        )
         return
 
     toolbar, sizing = st.columns([4, 1])
@@ -193,7 +221,10 @@ def _render_competitors(cluster: OpportunityCluster) -> None:
         item for item in cluster.competitors if item.relationship_type != "irrelevant"
     ]
     if not visible:
-        st.info("No relevant competitors are stored yet.")
+        empty_state(
+            "No competitor research yet",
+            "Run competitor research to map direct, adjacent, and substitute products.",
+        )
         return
 
     relationships = sorted({item.relationship_type for item in visible})
@@ -237,7 +268,7 @@ def _render_competitors(cluster: OpportunityCluster) -> None:
 
 
 def _render_research_history(queries: list[SearchQuery], cluster_id: str) -> None:
-    st.subheader("Search history")
+    section_header("Search history")
     if not queries:
         st.info("No competitor queries have been run.")
         return
@@ -263,7 +294,7 @@ def _render_research_history(queries: list[SearchQuery], cluster_id: str) -> Non
 
 
 def _render_feedback_history(feedback: list[UserFeedback], cluster_id: str) -> None:
-    st.subheader("Correction history")
+    section_header("Correction history")
     if not feedback:
         st.info("No user corrections have been recorded.")
         return
@@ -475,8 +506,8 @@ def main() -> None:
     configure_page("Opportunity details", settings)
     page_header(
         "Opportunity details",
-        "Inspect evidence, market coverage, score logic, and the correction audit trail.",
-        eyebrow="Evidence review",
+        "Inspect the evidence, market context, score logic, and correction history.",
+        eyebrow="Opportunity analysis",
     )
     render_flash()
     SessionFactory = get_ui_session_factory(settings.database_url)
@@ -485,9 +516,15 @@ def main() -> None:
         with SessionFactory() as session:
             clusters = ClusterRepository(session).list(limit=1000)
         if not clusters:
-            st.info("No opportunity clusters exist yet.")
+            empty_state(
+                "No opportunity selected",
+                "Add evidence in Discover to create the first opportunity cluster.",
+            )
             render_page_link(
-                "pages/1_Discover.py", label="Open Discover", route="/Discover"
+                "pages/1_Discover.py",
+                label="Add evidence",
+                route="/Discover",
+                use_container_width=True,
             )
             return
 

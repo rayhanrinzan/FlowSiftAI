@@ -10,7 +10,6 @@ build/
 dist/
 htmlcov/
 .coverage
-insift.db
 *.db
 *.sqlite
 *.sqlite3

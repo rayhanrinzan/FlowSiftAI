@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     """Runtime settings loaded from environment variables or `.env`."""
 
     app_env: str = Field("development", env="APP_ENV")
-    database_url: str = Field("sqlite:///insift.db", env="DATABASE_URL")
+    database_url: str = Field("sqlite:///flowsift.db", env="DATABASE_URL")
     llm_provider: Optional[str] = Field(None, env="LLM_PROVIDER")
     llm_api_key: Optional[SecretStr] = Field(None, env="LLM_API_KEY")
     llm_model: str = Field("gpt-5.6-luna", env="LLM_MODEL")
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     reddit_client_id: Optional[str] = Field(None, env="REDDIT_CLIENT_ID")
     reddit_client_secret: Optional[SecretStr] = Field(None, env="REDDIT_CLIENT_SECRET")
     reddit_user_agent: str = Field(
-        "InSift/1.0 by configured-user", env="REDDIT_USER_AGENT"
+        "FlowSiftAI/1.0 by configured-user", env="REDDIT_USER_AGENT"
     )
     demo_mode: bool = Field(True, env="DEMO_MODE")
     log_level: str = Field("INFO", env="LOG_LEVEL")

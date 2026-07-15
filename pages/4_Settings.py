@@ -12,6 +12,7 @@ from src.ui.components import (
     page_header,
     render_database_error,
     render_flash,
+    section_header,
     set_flash,
     status_badge_html,
 )
@@ -38,8 +39,8 @@ def main() -> None:
     configure_page("Settings", settings)
     page_header(
         "Settings",
-        "Provider credentials, runtime controls, and database health.",
-        eyebrow="Environment",
+        "Manage provider readiness, runtime controls, and data connectivity.",
+        eyebrow="Workspace settings",
     )
     render_flash()
 
@@ -63,7 +64,10 @@ def main() -> None:
         "Demo" if settings.demo_mode else ("Live" if settings.live_ready else "Setup"),
     )
 
-    st.subheader("Readiness")
+    section_header(
+        "Provider readiness",
+        "Live workflows become available as each required provider is connected.",
+    )
     llm, embeddings, search, reddit = st.columns(4)
     with llm:
         _provider_status("Extraction", settings.llm_ready)
@@ -74,7 +78,7 @@ def main() -> None:
     with reddit:
         _provider_status("Reddit", settings.reddit_ready)
 
-    st.subheader("Database")
+    section_header("Database", "The active storage connection for this workspace.")
     status_column, address_column = st.columns([1, 4])
     status_column.markdown(
         status_badge_html(database_state, database_tone), unsafe_allow_html=True
@@ -87,7 +91,10 @@ def main() -> None:
     if database_state == "Unavailable":
         render_database_error("Database health", settings)
 
-    st.subheader("Configuration")
+    section_header(
+        "Configuration",
+        "Changes are stored locally in the ignored environment file.",
+    )
     with st.form("runtime-configuration"):
         app_env = st.selectbox(
             "Environment",
@@ -237,7 +244,7 @@ def main() -> None:
         except (OSError, ValueError) as exc:
             st.error(f"Configuration could not be saved: {exc}")
 
-    st.subheader("Cached views")
+    section_header("Cached views")
     if st.button("Clear cached views", use_container_width=True):
         clear_ui_data_caches()
         st.success("Cached dashboard, opportunity, and evidence views were cleared.")

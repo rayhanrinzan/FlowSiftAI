@@ -127,7 +127,7 @@ class OpenAIClient:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": "InSift/1.0",
+                "User-Agent": "FlowSiftAI/1.0",
             },
             method="POST",
         )

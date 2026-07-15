@@ -2,7 +2,8 @@
 
 import pytest
 
-from src.ui.components import paginate_items, status_badge_html
+from src.ui.components import fact_block_html, paginate_items, score_bar_html
+from src.ui.components import status_badge_html
 
 
 def test_pagination_returns_requested_slice() -> None:
@@ -41,3 +42,18 @@ def test_status_badge_escapes_user_controlled_text() -> None:
 
     assert "<script>" not in badge
     assert "&lt;script&gt;" in badge
+
+
+def test_score_bar_clamps_width_and_escapes_label() -> None:
+    score = score_bar_html("<Problem>", 140)
+
+    assert "width:100.0%" in score
+    assert "&lt;Problem&gt;" in score
+    assert "<Problem>" not in score
+
+
+def test_fact_block_escapes_values_and_uses_fallback() -> None:
+    fact = fact_block_html("Target", None, "<Unknown>")
+
+    assert "&lt;Unknown&gt;" in fact
+    assert "<Unknown>" not in fact

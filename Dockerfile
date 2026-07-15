@@ -10,17 +10,17 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --shell /usr/sbin/nologin insift \
+    && useradd --create-home --shell /usr/sbin/nologin flowsift \
     && mkdir /data \
-    && chown insift:insift /data
+    && chown flowsift:flowsift /data
 
 COPY requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
-COPY --chown=insift:insift . .
+COPY --chown=flowsift:flowsift . .
 
-USER insift
+USER flowsift
 
 EXPOSE 8501
 

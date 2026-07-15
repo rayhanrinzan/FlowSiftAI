@@ -1,4 +1,4 @@
-"""Initialize the local InSift database."""
+"""Initialize the local FlowSift AI database."""
 
 import logging
 from pathlib import Path

@@ -61,7 +61,7 @@ def test_post_url_collects_attributed_post_and_comment() -> None:
             return StubResponse({"access_token": "token"})
         return StubResponse([_listing([post]), _listing([comment])])
 
-    client = RedditClient("client", "secret", "InSift test", opener=opener)
+    client = RedditClient("client", "secret", "FlowSift AI test", opener=opener)
     submissions = client.submissions_from_url(
         "https://www.reddit.com/r/smallbusiness/comments/abc123/example/",
         max_results=2,
@@ -94,7 +94,7 @@ def test_keyword_search_uses_a_bounded_listing() -> None:
             return StubResponse({"access_token": "token"})
         return StubResponse(_listing([child]))
 
-    client = RedditClient("client", "secret", "InSift test", opener=opener)
+    client = RedditClient("client", "secret", "FlowSift AI test", opener=opener)
     submissions = client.submissions_from_keywords(
         "manual workflow", subreddit="operations", max_results=500
     )
@@ -106,7 +106,7 @@ def test_keyword_search_uses_a_bounded_listing() -> None:
 
 
 def test_non_reddit_url_is_rejected_before_network_access() -> None:
-    client = RedditClient("client", "secret", "InSift test")
+    client = RedditClient("client", "secret", "FlowSift AI test")
 
     with pytest.raises(RedditIngestionError, match="valid reddit.com"):
         client.submissions_from_url("https://example.com/comments/abc123")
