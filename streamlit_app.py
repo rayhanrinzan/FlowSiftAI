@@ -11,11 +11,11 @@ from src.ui.components import (
     configure_page,
     page_header,
     render_database_error,
-    render_page_link,
     status_badge_html,
 )
 from src.ui.data import DashboardSnapshot, EvidenceSummary, load_dashboard_snapshot
 from src.ui.formatting import format_datetime, format_score
+from src.ui.navigation import render_page_link
 
 
 def _render_opportunities(opportunities: tuple[RankedOpportunity, ...]) -> None:
