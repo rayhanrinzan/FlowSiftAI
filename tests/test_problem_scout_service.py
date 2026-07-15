@@ -116,7 +116,7 @@ def test_scout_promotes_one_persisted_opportunity_across_pages(
     assert [cluster.id for cluster in details] == [lead.cluster_id]
 
 
-def test_scout_keeps_one_off_evidence_out_of_opportunity_pages(
+def test_scout_exposes_one_off_evidence_as_pipeline_candidate(
     db_session: Session,
 ) -> None:
     provider = StaticLiveSearchProvider(_repeated_problem_results()[:1])
@@ -128,10 +128,51 @@ def test_scout_keeps_one_off_evidence_out_of_opportunity_pages(
 
     assert len(run.outcomes) == 1
     assert run.opportunities == ()
-    assert OpportunityService(db_session).ranked_opportunities(limit=10) == []
+    pipeline = OpportunityService(db_session).ranked_opportunities(limit=10)
+    assert len(pipeline) == 1
+    assert pipeline[0].pipeline_stage == "candidate"
+    assert pipeline[0].independent_source_count == 1
+    assert pipeline[0].target_customer == "clinic manager"
     clusters = ClusterRepository(db_session).list(limit=10)
     assert len(clusters) == 1
-    assert clusters[0].status == "archived"
+    assert clusters[0].status == "candidate"
+    assert ClusterRepository(db_session).list_promoted(limit=10) == []
+    assert [cluster.id for cluster in ClusterRepository(db_session).list_pipeline()] == [
+        clusters[0].id
+    ]
+
+
+def test_scout_rotates_queries_and_skips_previously_stored_sources(
+    db_session: Session,
+) -> None:
+    provider = StaticLiveSearchProvider(_repeated_problem_results()[:1])
+    service = ProblemScoutService(
+        provider,
+        _discovery(db_session),
+        DeterministicOpportunitySynthesizer(),
+    )
+
+    first = service.run(
+        focus="healthcare",
+        segment_limit=1,
+        results_per_segment=1,
+        scan_round=0,
+    )
+    first_queries = tuple(provider.queries)
+    provider.queries.clear()
+    second = service.run(
+        focus="healthcare",
+        segment_limit=1,
+        results_per_segment=1,
+        scan_round=1,
+    )
+
+    assert first.new_source_count == 1
+    assert second.new_source_count == 0
+    assert second.duplicate_count == 1
+    assert first_queries
+    assert provider.queries
+    assert first_queries[0] != provider.queries[0]
 
 
 def test_scout_uses_local_synthesis_when_openai_is_rate_limited(
@@ -235,4 +276,47 @@ def test_scout_rejects_generic_pages_solicitations_and_vendor_posts(
 
     assert [outcome.source.evidence.url for outcome in run.outcomes] == [
         "https://www.reddit.com/r/healthIT/comments/real/referrals/"
+    ]
+
+
+def test_scout_rejects_real_but_off_workflow_discussions(
+    db_session: Session,
+) -> None:
+    provider = StaticLiveSearchProvider(
+        [
+            SearchResult(
+                title="Cybersecurity is stressing out my Shopify store",
+                url=(
+                    "https://www.reddit.com/r/ecommerce/comments/security/"
+                    "shopify_cybersecurity/"
+                ),
+                snippet=(
+                    "I run an ecommerce store and customer data breaches are "
+                    "frustrating. Compliance work feels manual and expensive."
+                ),
+                score=0.93,
+            ),
+            SearchResult(
+                title="Order tracking emails consume my day",
+                url=(
+                    "https://www.reddit.com/r/ecommerce/comments/orders/"
+                    "tracking_email_work/"
+                ),
+                snippet=(
+                    "I run an ecommerce store and manually send order tracking "
+                    "emails every day. The repetitive work takes hours."
+                ),
+                score=0.91,
+            ),
+        ]
+    )
+
+    run = ProblemScoutService(
+        provider,
+        _discovery(db_session),
+        DeterministicOpportunitySynthesizer(),
+    ).run(focus="commerce", segment_limit=1, results_per_segment=2)
+
+    assert [outcome.source.evidence.url for outcome in run.outcomes] == [
+        "https://www.reddit.com/r/ecommerce/comments/orders/tracking_email_work/"
     ]

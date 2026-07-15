@@ -12,6 +12,7 @@ from src.research.competitor_search import (
 from src.research.public_discussion_search import (
     CommunityAPISearchProvider,
     ResilientPublicSearchProvider,
+    _plain_query,
     is_supported_discussion_url,
 )
 from src.research.schemas import SearchResult
@@ -107,6 +108,15 @@ def test_resilient_search_uses_public_fallback_after_tavily_failure() -> None:
     assert provider.search("workflow", max_results=3, search_depth="basic")[0].url == (
         "https://news.ycombinator.com/item?id=99"
     )
+
+
+def test_community_fallback_reduces_scout_query_to_workflow_terms() -> None:
+    query = (
+        "ecommerce operations manager merchant order tracking customer emails "
+        "manual takes hours frustrating reddit"
+    )
+
+    assert _plain_query(query) == "order tracking customer emails"
 
 
 def test_tavily_request_uses_domain_filter() -> None:

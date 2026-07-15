@@ -22,6 +22,7 @@ class DashboardMetrics:
 
     evidence_count: int
     cluster_count: int
+    confirmed_opportunity_count: int
     researched_opportunity_count: int
 
 
@@ -33,12 +34,14 @@ class RankedOpportunity:
     title: str
     target_customer: Optional[str]
     evidence_count: int
+    independent_source_count: int
     problem_score: Optional[float]
     whitespace_score: Optional[float]
     opportunity_score: Optional[float]
     confidence_score: Optional[float]
     competitor_count: int
     pain_types: tuple[str, ...]
+    pipeline_stage: str
     research_status: str
     last_updated: Optional[datetime]
 
@@ -52,12 +55,15 @@ class OpportunityService:
     def dashboard_metrics(self) -> DashboardMetrics:
         """Return high-level dashboard counts."""
 
-        promoted = ClusterRepository(self.session).list_promoted(limit=100_000)
+        pipeline = ClusterRepository(self.session).list_pipeline(limit=100_000)
         return DashboardMetrics(
             evidence_count=EvidenceRepository(self.session).count_visible(),
-            cluster_count=len(promoted),
+            cluster_count=len(pipeline),
+            confirmed_opportunity_count=sum(
+                cluster.independent_source_count >= 2 for cluster in pipeline
+            ),
             researched_opportunity_count=sum(
-                cluster.status == "researched" for cluster in promoted
+                cluster.status == "researched" for cluster in pipeline
             ),
         )
 
@@ -65,7 +71,7 @@ class OpportunityService:
         """Return clusters with their latest score, ordered by opportunity score."""
 
         rows: list[RankedOpportunity] = []
-        clusters = ClusterRepository(self.session).list_promoted(limit=limit)
+        clusters = ClusterRepository(self.session).list_pipeline(limit=limit)
         for cluster in clusters:
             evidence_items = [
                 link.evidence_item
@@ -84,6 +90,7 @@ class OpportunityService:
                     title=cluster.title,
                     target_customer=cluster.target_customer,
                     evidence_count=len({item.id for item in evidence_items}),
+                    independent_source_count=cluster.independent_source_count,
                     problem_score=self._problem_score(latest_score),
                     whitespace_score=(
                         latest_score.whitespace_score if latest_score else None
@@ -103,6 +110,11 @@ class OpportunityService:
                                 for pain in (item.pain_types or [])
                             }
                         )
+                    ),
+                    pipeline_stage=(
+                        "candidate"
+                        if cluster.independent_source_count < 2
+                        else "confirmed"
                     ),
                     research_status=cluster.status,
                     last_updated=cluster.updated_at,

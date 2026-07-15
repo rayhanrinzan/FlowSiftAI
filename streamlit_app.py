@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import importlib
+
 import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
+
+from src import runtime as _runtime
+
+_runtime = importlib.reload(_runtime)
+_runtime.ensure_runtime_current()
 
 from src.config import get_settings
 from src.services.opportunity_service import RankedOpportunity
@@ -53,15 +60,20 @@ def _render_opportunities(opportunities: tuple[RankedOpportunity, ...]) -> None:
                         opportunity.target_customer or "Target customer not established"
                     )
                     st.caption(
-                        f"{target} | {opportunity.evidence_count} evidence | "
+                        f"{target} | {opportunity.independent_source_count} independent source(s) | "
                         f"{opportunity.competitor_count} competitors"
+                    )
+                    stage_label = (
+                        "Needs corroboration"
+                        if opportunity.pipeline_stage == "candidate"
+                        else "Confirmed opportunity"
                     )
                     st.markdown(
                         status_badge_html(
-                            opportunity.research_status.replace("_", " ").title(),
-                            "good"
-                            if opportunity.research_status == "researched"
-                            else "neutral",
+                            stage_label,
+                            "warn"
+                            if opportunity.pipeline_stage == "candidate"
+                            else "good",
                         ),
                         unsafe_allow_html=True,
                     )
@@ -115,16 +127,11 @@ def _render_recent_evidence(evidence_items: tuple[EvidenceSummary, ...]) -> None
 
 def _render_metrics(snapshot: DashboardSnapshot) -> None:
     metrics = snapshot.metrics
-    coverage = (
-        (metrics.researched_opportunity_count / metrics.cluster_count) * 100
-        if metrics.cluster_count
-        else 0.0
-    )
-    evidence, clusters, researched, coverage_column = st.columns(4)
+    evidence, clusters, confirmed, researched = st.columns(4)
     evidence.metric("Evidence items", metrics.evidence_count)
-    clusters.metric("Opportunity clusters", metrics.cluster_count)
+    clusters.metric("Problem signals", metrics.cluster_count)
+    confirmed.metric("Confirmed opportunities", metrics.confirmed_opportunity_count)
     researched.metric("Researched opportunities", metrics.researched_opportunity_count)
-    coverage_column.metric("Research coverage", f"{coverage:.0f}%")
 
 
 def main() -> None:
@@ -160,8 +167,8 @@ def main() -> None:
     _render_metrics(snapshot)
 
     section_header(
-        "Highest-ranked opportunities",
-        "Problem strength, market whitespace, and confidence in one view.",
+        "Opportunity pipeline",
+        "Every accepted Discover signal appears here; corroborated problems are marked confirmed.",
     )
     _render_opportunities(snapshot.opportunities)
 

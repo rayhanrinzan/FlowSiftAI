@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import importlib
 from typing import Any
 
 import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
+
+from src import runtime as _runtime
+
+_runtime = importlib.reload(_runtime)
+_runtime.ensure_runtime_current()
 
 from src.config import get_settings
 from src.database.models import (
@@ -110,16 +116,23 @@ def _render_overview(
     cluster: OpportunityCluster,
     score: OpportunityScore | None,
 ) -> None:
+    is_candidate = cluster.independent_source_count < 2
     state, updated = st.columns([3, 1])
     state.markdown(
         status_badge_html(
-            cluster.status.replace("_", " ").title(),
-            "good" if cluster.status == "researched" else "neutral",
+            "Needs corroboration" if is_candidate else "Confirmed opportunity",
+            "warn" if is_candidate else "good",
         ),
         unsafe_allow_html=True,
     )
     updated.caption(f"Updated {format_datetime(cluster.updated_at)}")
     st.write(cluster.problem_summary)
+    if is_candidate:
+        st.warning(
+            "This signal has one independent source. It is visible across the product, "
+            "but needs one more matching discussion before FlowSift AI treats it as a "
+            "confirmed opportunity."
+        )
 
     target, workaround, solution = st.columns(3)
     target.markdown(
@@ -534,7 +547,7 @@ def main() -> None:
 
     try:
         with SessionFactory() as session:
-            clusters = ClusterRepository(session).list_promoted(limit=1000)
+            clusters = ClusterRepository(session).list_pipeline(limit=1000)
         if not clusters:
             empty_state(
                 "No opportunity selected",

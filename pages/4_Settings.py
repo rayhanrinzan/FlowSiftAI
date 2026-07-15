@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import importlib
+
 import streamlit as st
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+
+from src import runtime as _runtime
+
+_runtime = importlib.reload(_runtime)
+_runtime.ensure_runtime_current()
 
 from src.config import get_settings, redacted_database_url, update_env_file
 from src.ui.components import (
