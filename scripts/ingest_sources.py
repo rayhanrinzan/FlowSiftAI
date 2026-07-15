@@ -20,7 +20,7 @@ from src.services.discovery_service import build_discovery_service
 def build_parser() -> argparse.ArgumentParser:
     """Build CLI arguments."""
 
-    parser = argparse.ArgumentParser(description="Ingest discussions into InSift.")
+    parser = argparse.ArgumentParser(description="Ingest discussions into FlowSift AI.")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--text", help="One manually submitted discussion.")
     source.add_argument("--csv", type=Path, help="Path to a UTF-8 source CSV.")

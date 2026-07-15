@@ -3,11 +3,11 @@ gatherUsageStats = false
 
 [server]
 headless = false
-runOnSave = false
+runOnSave = true
 
 [theme]
-primaryColor = "#0F766E"
-backgroundColor = "#F6F8F6"
+primaryColor = "#6D5DFB"
+backgroundColor = "#F7F7F5"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#172126"
+textColor = "#18181B"
 font = "sans serif"

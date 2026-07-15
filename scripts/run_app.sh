@@ -5,8 +5,8 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-if [[ -n "${INSIFT_PYTHON:-}" ]]; then
-    PYTHON_BIN="$INSIFT_PYTHON"
+if [[ -n "${FLOWSIFT_PYTHON:-}" ]]; then
+    PYTHON_BIN="$FLOWSIFT_PYTHON"
 elif [[ -x "/opt/anaconda3/bin/python" ]]; then
     # The project-local .venv may be offloaded by macOS; Anaconda is local here.
     PYTHON_BIN="/opt/anaconda3/bin/python"
@@ -18,7 +18,7 @@ else
 fi
 
 if ! "$PYTHON_BIN" -c "import streamlit, sqlalchemy, pydantic" >/dev/null 2>&1; then
-    echo "InSift dependencies are not installed for $PYTHON_BIN." >&2
+    echo "FlowSift AI dependencies are not installed for $PYTHON_BIN." >&2
     echo "Run: $PYTHON_BIN -m pip install -r requirements.txt" >&2
     exit 1
 fi
@@ -30,6 +30,6 @@ fi
 
 "$PYTHON_BIN" scripts/initialize_database.py
 
-echo "Starting InSift with $PYTHON_BIN"
+echo "Starting FlowSift AI with $PYTHON_BIN"
 echo "Open the Local URL that Streamlit prints below."
 exec "$PYTHON_BIN" -m streamlit run streamlit_app.py "$@"

@@ -9,60 +9,73 @@ from src.config import get_settings
 from src.services.opportunity_service import RankedOpportunity
 from src.ui.components import (
     configure_page,
+    empty_state,
     page_header,
     page_size_control,
     paginate_items,
     render_database_error,
     render_pagination,
-    score_tone,
+    score_bar_html,
+    section_header,
     status_badge_html,
 )
 from src.ui.data import load_ranked_opportunities
-from src.ui.formatting import format_datetime, format_score
-
-
-def _score_cell(column: object, label: str, value: float | None) -> None:
-    column.markdown(
-        status_badge_html(format_score(value), score_tone(value)),
-        unsafe_allow_html=True,
-    )
-    column.caption(label)
+from src.ui.formatting import format_datetime
 
 
 def _render_rows(rows: tuple[RankedOpportunity, ...]) -> None:
     if not rows:
-        st.info("No opportunities match the current filters.")
+        empty_state(
+            "No matching opportunities",
+            "Adjust the filters or add more evidence to broaden the ranked set.",
+        )
         return
 
-    for row in rows:
-        with st.container(border=True):
-            summary, problem, whitespace, opportunity, confidence = st.columns(
-                [3.5, 1, 1, 1, 1]
-            )
-            if summary.button(
-                row.title,
-                key=f"open-{row.cluster_id}",
-                use_container_width=True,
-            ):
-                st.session_state["selected_cluster_id"] = row.cluster_id
-                st.switch_page("pages/3_Opportunity_Details.py")
-            summary.caption(
-                f"{row.target_customer or 'Target customer not established'} | "
-                f"{row.evidence_count} evidence item(s) | "
-                f"{row.competitor_count} competitor(s) | "
-                f"Updated {format_datetime(row.last_updated)}"
-            )
-            summary.markdown(
-                status_badge_html(
-                    row.research_status.replace("_", " ").title(),
-                    "good" if row.research_status == "researched" else "neutral",
-                ),
-                unsafe_allow_html=True,
-            )
-            _score_cell(problem, "Problem", row.problem_score)
-            _score_cell(whitespace, "White-space", row.whitespace_score)
-            _score_cell(opportunity, "Opportunity", row.opportunity_score)
-            _score_cell(confidence, "Confidence", row.confidence_score)
+    for index in range(0, len(rows), 2):
+        columns = st.columns(2)
+        for column, row in zip(columns, rows[index : index + 2]):
+            with column:
+                with st.container(border=True):
+                    if st.button(
+                        row.title,
+                        key=f"open-{row.cluster_id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["selected_cluster_id"] = row.cluster_id
+                        st.switch_page("pages/3_Opportunity_Details.py")
+                    st.caption(
+                        f"{row.target_customer or 'Target customer not established'} | "
+                        f"{row.evidence_count} evidence | "
+                        f"{row.competitor_count} competitors"
+                    )
+                    state, updated = st.columns([1, 2])
+                    state.markdown(
+                        status_badge_html(
+                            row.research_status.replace("_", " ").title(),
+                            "good"
+                            if row.research_status == "researched"
+                            else "neutral",
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    updated.caption(f"Updated {format_datetime(row.last_updated)}")
+                    left, right = st.columns(2)
+                    left.markdown(
+                        score_bar_html("Problem", row.problem_score),
+                        unsafe_allow_html=True,
+                    )
+                    right.markdown(
+                        score_bar_html("Market gap", row.whitespace_score),
+                        unsafe_allow_html=True,
+                    )
+                    left.markdown(
+                        score_bar_html("Opportunity", row.opportunity_score),
+                        unsafe_allow_html=True,
+                    )
+                    right.markdown(
+                        score_bar_html("Confidence", row.confidence_score),
+                        unsafe_allow_html=True,
+                    )
 
 
 def main() -> None:
@@ -72,8 +85,8 @@ def main() -> None:
     configure_page("Opportunities", settings)
     page_header(
         "Opportunities",
-        "Compare ranked problem clusters and open the evidence behind any score.",
-        eyebrow="Ranked market signals",
+        "Compare ranked problems, market gaps, and the confidence behind each signal.",
+        eyebrow="Opportunity pipeline",
     )
     try:
         with st.spinner("Loading ranked opportunities..."):
@@ -82,7 +95,7 @@ def main() -> None:
         render_database_error("The opportunity list", settings)
         return
 
-    with st.expander("Filters", expanded=True):
+    with st.expander("Filters", expanded=False):
         first, second, third = st.columns(3)
         minimum_score = first.slider("Minimum opportunity score", 0, 100, 0)
         minimum_confidence = second.slider("Minimum confidence", 0, 100, 0)
@@ -114,6 +127,10 @@ def main() -> None:
         )
     ]
 
+    section_header(
+        "Ranked results",
+        f"{len(filtered)} of {len(rows)} opportunities match the current view.",
+    )
     sort_column, direction_column, size_column = st.columns([3, 1, 1])
     sort_key = sort_column.selectbox(
         "Sort by",
@@ -141,7 +158,6 @@ def main() -> None:
 
     page_number = int(st.session_state.get("opportunities-page", 1))
     page_slice = paginate_items(filtered, page=page_number, page_size=page_size)
-    st.caption(f"{len(filtered)} opportunity result(s)")
     _render_rows(page_slice.items)
     if filtered:
         render_pagination(page_slice, "opportunities")

@@ -1,6 +1,6 @@
-# InSift Deployment
+# FlowSift AI Deployment
 
-InSift can run as a local SQLite demo, a Docker container, or a hosted Streamlit application backed by PostgreSQL. Production deployments should use PostgreSQL and execute Alembic migrations before starting the web process.
+FlowSift AI can run as a local SQLite demo, a Docker container, or a hosted Streamlit application backed by PostgreSQL. Production deployments should use PostgreSQL and execute Alembic migrations before starting the web process.
 
 ## Runtime Requirements
 
@@ -16,22 +16,22 @@ Never bake `.env`, API keys, or a local database file into an image.
 Build the image from the repository root:
 
 ```bash
-docker build -t insift .
-docker volume create insift-data
+docker build -t flowsift-ai .
+docker volume create flowsift-ai-data
 ```
 
 Initialize and seed a persistent SQLite demo volume:
 
 ```bash
 docker run --rm \
-  --env DATABASE_URL=sqlite:////data/insift.db \
-  --volume insift-data:/data \
-  insift python scripts/initialize_database.py
+  --env DATABASE_URL=sqlite:////data/flowsift.db \
+  --volume flowsift-ai-data:/data \
+  flowsift-ai python scripts/initialize_database.py
 
 docker run --rm \
-  --env DATABASE_URL=sqlite:////data/insift.db \
-  --volume insift-data:/data \
-  insift python scripts/seed_demo_data.py
+  --env DATABASE_URL=sqlite:////data/flowsift.db \
+  --volume flowsift-ai-data:/data \
+  flowsift-ai python scripts/seed_demo_data.py
 ```
 
 Start the application:
@@ -39,9 +39,9 @@ Start the application:
 ```bash
 docker run --rm \
   --publish 8501:8501 \
-  --env DATABASE_URL=sqlite:////data/insift.db \
-  --volume insift-data:/data \
-  insift
+  --env DATABASE_URL=sqlite:////data/flowsift.db \
+  --volume flowsift-ai-data:/data \
+  flowsift-ai
 ```
 
 Open `http://localhost:8501`. The container health check uses Streamlit's `/_stcore/health` endpoint.

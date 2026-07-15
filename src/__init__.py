@@ -1,1 +1,1 @@
-"""InSift application package."""
+"""FlowSift AI application package."""

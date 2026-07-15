@@ -22,6 +22,7 @@ from src.ui.components import (
     paginate_items,
     render_database_error,
     render_pagination,
+    section_header,
     status_badge_html,
 )
 from src.ui.data import (
@@ -38,7 +39,7 @@ def _render_result(result: DiscoveryResult) -> None:
     """Render one ingestion outcome without exposing internal exceptions."""
 
     if result.duplicate:
-        st.info("This discussion already exists. InSift reused the stored record.")
+        st.info("This discussion already exists. FlowSift AI reused the stored record.")
     elif result.accepted and result.assignment and result.score:
         label = "Created" if result.assignment.created else "Matched"
         st.success(
@@ -154,7 +155,7 @@ def main() -> None:
     configure_page("Discover", settings)
     page_header(
         "Discover",
-        "Collect a discussion, verify the extracted problem, and update opportunity clusters.",
+        "Turn a real customer discussion into structured, scoreable problem evidence.",
         eyebrow="Evidence intake",
     )
     SessionFactory = get_ui_session_factory(settings.database_url)
@@ -179,7 +180,9 @@ def main() -> None:
             discussion = st.text_area(
                 "Discussion text",
                 height=220,
-                placeholder="Paste one first-person complaint or workflow discussion...",
+                placeholder=(
+                    "Paste a first-person complaint, workaround, or workflow discussion..."
+                ),
             )
             left, right = st.columns(2)
             title = left.text_input("Title (optional)")
@@ -308,7 +311,10 @@ def main() -> None:
             except SQLAlchemyError:
                 render_database_error("CSV ingestion", settings)
 
-    st.subheader("Extraction review")
+    section_header(
+        "Extraction review",
+        "Verify what was accepted as problem evidence and what needs review.",
+    )
     try:
         with st.spinner("Loading the review queue..."):
             recent = load_evidence_review(settings.database_url)

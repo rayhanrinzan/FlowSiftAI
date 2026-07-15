@@ -1,4 +1,4 @@
-"""Structured logging setup for InSift."""
+"""Structured logging setup for FlowSift AI."""
 
 import json
 import logging

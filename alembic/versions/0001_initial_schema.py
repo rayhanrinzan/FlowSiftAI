@@ -1,4 +1,4 @@
-"""Create initial InSift schema.
+"""Create initial FlowSift AI schema.
 
 Revision ID: 0001_initial_schema
 Revises:

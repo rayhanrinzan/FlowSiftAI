@@ -1,4 +1,4 @@
-"""SQLAlchemy models for InSift's core entities."""
+"""SQLAlchemy models for FlowSift AI's core entities."""
 
 from __future__ import annotations
 

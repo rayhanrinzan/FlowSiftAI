@@ -1,47 +1,47 @@
-# InSift
+# FlowSift AI
 
-InSift turns evidence from real online discussions into ranked, explainable startup opportunities. It collects problem statements, clusters related pain points, researches competitors, scores market gaps, and keeps every conclusion connected to its source evidence.
+FlowSift AI turns evidence from real online discussions into ranked, explainable startup opportunities. It collects problem statements, clusters related pain points, researches competitors, scores market gaps, and keeps every conclusion connected to its source evidence.
 
-## Run InSift Now
+## Run FlowSift AI Now
 
 Run commands from the repository root, the folder containing `streamlit_app.py`.
 
 ```bash
-cd /path/to/InSift
+cd /path/to/flowsift-ai
 bash scripts/run_app.sh
 ```
 
 The launcher:
 
-1. Uses `INSIFT_PYTHON` when you explicitly provide one.
+1. Uses `FLOWSIFT_PYTHON` when you explicitly provide one.
 2. Uses `/opt/anaconda3/bin/python` on the Mac where this project was built.
 3. Falls back to `python3` on other machines.
 4. Creates `.env` from `.env.example` when needed.
 5. Initializes the configured database safely.
 6. Starts the Streamlit application.
 
-Open [http://localhost:8501](http://localhost:8501) when the terminal prints the Local URL. Keep that terminal open while using InSift. Press `Control+C` in the terminal to stop the app.
+Open [http://localhost:8501](http://localhost:8501) when the terminal prints the Local URL. Keep that terminal open while using FlowSift AI. Press `Control+C` in the terminal to stop the app.
 
 The project-local `.venv` in the original macOS checkout was offloaded by macOS and can stall while importing packages. The launcher deliberately uses the working Anaconda Python on that machine. Do not activate that `.venv`.
 
 To use another Python installation or another port:
 
 ```bash
-INSIFT_PYTHON=/path/to/python bash scripts/run_app.sh --server.port 8502
+FLOWSIFT_PYTHON=/path/to/python bash scripts/run_app.sh --server.port 8502
 ```
 
 ## What "Fully Live" Means
 
 The web server can run without provider credentials, but real extraction, semantic clustering, web research, and Reddit collection require external API access.
 
-InSift is fully live when the **Settings** page shows all four readiness badges as **Ready**:
+FlowSift AI is fully live when the **Settings** page shows all four readiness badges as **Ready**:
 
 - **Extraction:** OpenAI is configured.
 - **Embeddings:** OpenAI embeddings or local Sentence Transformers are configured.
 - **Research:** Tavily is configured.
 - **Reddit:** approved Reddit OAuth credentials are configured.
 
-An empty live database is normal. Opportunities appear only after InSift processes evidence.
+An empty live database is normal. Opportunities appear only after FlowSift AI processes evidence.
 
 ## Fully Launch the Product
 
@@ -55,7 +55,7 @@ You need:
 
 Reddit may require application review or approval. Manual paste and CSV ingestion still work without Reddit after OpenAI is ready.
 
-Never commit API keys. InSift stores locally entered credentials in the ignored `.env` file.
+Never commit API keys. FlowSift AI stores locally entered credentials in the ignored `.env` file.
 
 ### 2. Start the application
 
@@ -82,9 +82,9 @@ Open **Settings** in the left navigation and set:
 | Tavily API key | Your Tavily API key |
 | Reddit client ID | Your approved OAuth client ID |
 | Reddit client secret | Your approved OAuth client secret |
-| Reddit user agent | A descriptive value naming InSift and its operator |
+| Reddit user agent | A descriptive value naming FlowSift AI and its operator |
 
-Leave the database as `sqlite:///insift_live.db` for a local live launch. Click **Save configuration**.
+Leave the database as `sqlite:///flowsift_live.db` for a local live launch. Click **Save configuration**.
 
 The default OpenAI model is the cost-sensitive GPT-5.6 variant. OpenAI embeddings use `text-embedding-3-small`, which is intended for tasks including clustering and similarity search.
 
@@ -204,7 +204,7 @@ bash scripts/run_app.sh
 
 The seed script is safe to run repeatedly and avoids duplicate demo evidence and competitors.
 
-To return to the live product, open **Settings**, turn **Demo mode** off, restore `sqlite:///insift_live.db`, save, and restart the launcher.
+To return to the live product, open **Settings**, turn **Demo mode** off, restore `sqlite:///flowsift_live.db`, save, and restart the launcher.
 
 ## First-Time Installation on Another Machine
 
@@ -213,12 +213,12 @@ Requirements: Python 3.11 or newer and network access for package installation.
 Create the virtual environment outside cloud-synced folders so macOS does not offload package files:
 
 ```bash
-python3.11 -m venv ~/.virtualenvs/insift
-source ~/.virtualenvs/insift/bin/activate
+python3.11 -m venv ~/.virtualenvs/flowsift
+source ~/.virtualenvs/flowsift/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 cp .env.example .env
-INSIFT_PYTHON="$HOME/.virtualenvs/insift/bin/python" bash scripts/run_app.sh
+FLOWSIFT_PYTHON="$HOME/.virtualenvs/flowsift/bin/python" bash scripts/run_app.sh
 ```
 
 ## Daily Start and Stop
@@ -226,7 +226,7 @@ INSIFT_PYTHON="$HOME/.virtualenvs/insift/bin/python" bash scripts/run_app.sh
 Start:
 
 ```bash
-cd /path/to/InSift
+cd /path/to/flowsift-ai
 bash scripts/run_app.sh
 ```
 
@@ -270,7 +270,7 @@ Open **Settings** and inspect the readiness badges:
 
 ### A provider says Setup required
 
-Confirm the provider is selected and its key is saved. Restart the app after changing `.env`. InSift checks whether credentials are configured; the first real request also verifies whether the provider accepts them.
+Confirm the provider is selected and its key is saved. Restart the app after changing `.env`. FlowSift AI checks whether credentials are configured; the first real request also verifies whether the provider accepts them.
 
 ### Check whether the server is healthy
 
@@ -282,7 +282,7 @@ A healthy server returns `ok`.
 
 ## Scoring
 
-InSift stores versioned score records with structured explanations.
+FlowSift AI stores versioned score records with structured explanations.
 
 ```text
 Problem Score = 35% Pain Severity + 25% Problem Frequency
@@ -335,7 +335,7 @@ Run database migrations:
 SQLite is appropriate for one local user. A hosted production deployment should use PostgreSQL, execute Alembic migrations before startup, and inject secrets through the hosting platform rather than `.env`.
 
 ```bash
-docker build -t insift .
+docker build -t flowsift-ai .
 ```
 
 See [Deployment](docs/DEPLOYMENT.md) for Docker, PostgreSQL, Streamlit Community Cloud, health checks, and rollback instructions.
@@ -360,7 +360,7 @@ flowchart TD
 - Store API keys only in ignored `.env` files or managed secret stores.
 - Preserve source attribution and collect only the text needed for the product workflow.
 - Review each source platform's terms before commercial collection.
-- Do not use InSift as an unrestricted scraper.
+- Do not use FlowSift AI as an unrestricted scraper.
 - Do not assume that no competitors found means a market is attractive.
 
 ## Current Limitations
