@@ -1,5 +1,6 @@
 """Tests for actionable problem, product, and competition briefs."""
 
+import pytest
 from sqlalchemy.orm import Session
 
 from src.database.repositories import (
@@ -7,7 +8,10 @@ from src.database.repositories import (
     CompetitorRepository,
     EvidenceRepository,
 )
-from src.services.opportunity_brief_service import build_opportunity_brief
+from src.services.opportunity_brief_service import (
+    build_opportunity_brief,
+    opportunity_workflow,
+)
 
 
 def _accounting_cluster(session: Session):
@@ -92,3 +96,44 @@ def test_brief_blocks_generic_build_when_direct_competitor_exists(
     assert "CloseFlow" in assessment.summary
     assert "Do not copy" in assessment.recommendation
     assert assessment.gaps == ("Existing tools require enterprise implementation.",)
+
+
+@pytest.mark.parametrize(
+    ("title", "problem_summary", "expected"),
+    [
+        (
+            "How do small wholesale teams manage everything?",
+            "We run a small wholesale business and stock gets messy fast.",
+            "wholesale order and inventory coordination",
+        ),
+        (
+            "Managing 200 wholesale accounts in spreadsheets",
+            "Each account has different pricing and order history.",
+            "wholesale account management",
+        ),
+        (
+            "Looking for a simple way to capture issues in the factory",
+            "Operators need to record factory issues from a QR code.",
+            "factory issue capture",
+        ),
+        (
+            "Processing orders like it is 1999",
+            "Staff are editing orders, sending invoices, and processing payments.",
+            "order-to-cash administration",
+        ),
+    ],
+)
+def test_workflow_labels_explain_current_production_problem_types(
+    db_session: Session,
+    title: str,
+    problem_summary: str,
+    expected: str,
+) -> None:
+    cluster = ClusterRepository(db_session).create(
+        title=title,
+        problem_summary=problem_summary,
+        target_customer="Operations teams",
+        status="candidate",
+    )
+
+    assert opportunity_workflow(cluster) == expected
