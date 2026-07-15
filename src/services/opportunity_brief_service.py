@@ -63,6 +63,13 @@ class OpportunityBrief:
 
 
 WORKFLOW_LABELS: tuple[tuple[str, str], ...] = (
+    ("capture issues in the factory", "factory issue capture"),
+    ("capture issues", "factory issue capture"),
+    ("wholesale accounts", "wholesale account management"),
+    ("stock gets messy", "wholesale order and inventory coordination"),
+    ("small wholesale business", "wholesale order and inventory coordination"),
+    ("editing orders", "order-to-cash administration"),
+    ("processing payments", "order-to-cash administration"),
     ("month end close", "month-end close"),
     ("month-end close", "month-end close"),
     ("order tracking", "order-tracking communication"),
@@ -274,11 +281,18 @@ def _workflow_label(cluster: OpportunityCluster) -> str:
         if marker in text:
             return label
     cleaned = re.sub(r"[^a-z0-9\s-]", " ", cluster.title.lower())
+    if re.search(
+        r"^(?:how|what|why|where|looking for|can anyone|does anyone)\b", cleaned
+    ):
+        return "workflow coordination"
     cleaned = re.sub(
         r"\b(?:need|software|tool|problem|help|using|workflow)\b", " ", cleaned
     )
     words = " ".join(cleaned.split()).split()[:7]
-    return " ".join(words) or "documented workflow"
+    candidate = " ".join(words)
+    if "manage everything" in candidate:
+        return "workflow coordination"
+    return candidate or "workflow coordination"
 
 
 def _problem_statement(
