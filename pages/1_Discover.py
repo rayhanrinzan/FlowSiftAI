@@ -1,4 +1,4 @@
-"""Manual and CSV evidence discovery workflow."""
+"""Automated, manual, CSV, and Reddit evidence discovery workflows."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.clustering.embeddings import EmbeddingError
-from src.config import get_settings
+from src.config import Settings, get_settings
 from src.extraction.problem_extractor import ExtractionError
 from src.ingestion.manual import (
     IngestionError,
@@ -15,7 +15,10 @@ from src.ingestion.manual import (
 )
 from src.ingestion.reddit import RedditIngestionError, build_reddit_client
 from src.ingestion.web import (
+    SCOUT_FOCUS_LABELS,
     WEB_SOURCE_LABELS,
+    AutomatedOpportunityScout,
+    ScoutedOpportunity,
     WebEvidenceCandidate,
     WebEvidenceDiscoveryService,
 )
@@ -210,6 +213,222 @@ def _render_web_candidates(
         st.session_state.pop("web-evidence-candidates", None)
 
 
+def _render_scout_leads(
+    leads: list[ScoutedOpportunity],
+    *,
+    settings: Settings,
+    SessionFactory: object,
+) -> None:
+    """Render grouped, preselected evidence for automatically sourced leads."""
+
+    if not leads:
+        st.info("No sourced opportunity leads were found in this scan.")
+        return
+
+    source_count = sum(len(lead.candidates) for lead in leads)
+    section_header(
+        "Sourced opportunity leads",
+        f"{len(leads)} workflows supported by {source_count} public source(s).",
+    )
+    selected: list[WebEvidenceCandidate] = []
+    for lead in leads:
+        with st.container(border=True):
+            heading, evidence_count = st.columns([4, 1])
+            heading.markdown(f"**{lead.theme.title}**")
+            heading.caption(lead.theme.target_customer)
+            evidence_count.metric("Sources", len(lead.candidates))
+            for index, candidate in enumerate(lead.candidates):
+                checked = st.checkbox(
+                    candidate.title,
+                    value=True,
+                    key=f"scout-{lead.theme.key}-{index}-{candidate.url}",
+                )
+                source, relevance, action = st.columns([2.5, 1, 1])
+                source.caption(candidate.domain)
+                relevance.caption(f"Relevance {candidate.score * 100:.0f}")
+                action.link_button(
+                    "Open source",
+                    candidate.url,
+                    use_container_width=True,
+                )
+                st.write(candidate.preview)
+                if checked:
+                    selected.append(candidate)
+                if index < len(lead.candidates) - 1:
+                    st.divider()
+
+    if not settings.discovery_ready:
+        st.info(
+            "The scout can find sources now. Configure extraction and embeddings "
+            "to turn them into ranked opportunities."
+        )
+    if st.button(
+        f"Build opportunities from {len(selected)} selected source(s)",
+        type="primary",
+        use_container_width=True,
+        disabled=not selected or not settings.discovery_ready,
+    ):
+        try:
+            _process_batch(
+                [candidate.to_submission() for candidate in selected],
+                SessionFactory=SessionFactory,
+                label="scouted source(s)",
+            )
+            st.session_state.pop("scouted-opportunities", None)
+            st.session_state.pop("scouted-opportunity-focus", None)
+            render_page_link(
+                "pages/2_Opportunities.py",
+                label="Review ranked opportunities",
+                route="/Opportunities",
+                use_container_width=True,
+            )
+        except (IngestionError, ExtractionError, EmbeddingError) as exc:
+            st.error(f"The selected sources could not be processed: {exc}")
+        except SQLAlchemyError:
+            render_database_error("Scouted evidence ingestion", settings)
+
+
+def _render_opportunity_scout(
+    *,
+    settings: Settings,
+    SessionFactory: object,
+) -> None:
+    """Render the no-prompt automated discovery workflow."""
+
+    label_to_focus = {label: key for key, label in SCOUT_FOCUS_LABELS.items()}
+    selected_focus_label = st.selectbox(
+        "Market focus",
+        list(label_to_focus),
+        index=0,
+    )
+    focus = label_to_focus[selected_focus_label]
+    stored_focus = st.session_state.get("scouted-opportunity-focus")
+    has_results = stored_focus == focus and "scouted-opportunities" in st.session_state
+    scan_submitted = st.button(
+        "Scan another batch" if has_results else "Scan for opportunities",
+        type="primary",
+        use_container_width=True,
+        disabled=not settings.search_ready,
+    )
+    if not settings.search_ready:
+        st.info(
+            "Configure Tavily in Settings for live opportunity scouting, or "
+            "enable Demo mode to run an offline scan."
+        )
+    if scan_submitted:
+        scan_index_key = f"opportunity-scout-index-{focus}"
+        scan_index = int(st.session_state.get(scan_index_key, 0))
+        st.session_state.pop("scouted-opportunities", None)
+        try:
+            with st.status("Scanning public customer pain", expanded=True) as status:
+                status.write("Selecting customer workflows")
+                scout = AutomatedOpportunityScout(
+                    build_search_provider(settings),
+                    search_depth=settings.search_depth,
+                )
+                status.write("Searching and grouping attributable discussions")
+                leads = scout.scan(
+                    focus=focus,
+                    theme_limit=4,
+                    results_per_theme=3,
+                    offset=scan_index * 4,
+                )
+                st.session_state["scouted-opportunities"] = leads
+                st.session_state["scouted-opportunity-focus"] = focus
+                st.session_state[scan_index_key] = scan_index + 1
+                source_count = sum(len(lead.candidates) for lead in leads)
+                status.update(
+                    label=(f"Found {len(leads)} lead(s) from {source_count} source(s)"),
+                    state="complete",
+                    expanded=False,
+                )
+        except (IngestionError, SearchProviderError) as exc:
+            st.error(f"Opportunity scouting could not complete: {exc}")
+
+    if stored_focus == focus or scan_submitted:
+        scout_leads = st.session_state.get("scouted-opportunities")
+        if scout_leads is not None:
+            _render_scout_leads(
+                scout_leads,
+                settings=settings,
+                SessionFactory=SessionFactory,
+            )
+
+
+def _render_topic_search(
+    *,
+    settings: Settings,
+    SessionFactory: object,
+) -> None:
+    """Render evidence search for users who already have a direction."""
+
+    with st.form("web-discovery"):
+        topic = st.text_input(
+            "Market, workflow, or problem",
+            placeholder="patient referral follow-up, vendor renewals, manual invoicing...",
+        )
+        target_customer = st.text_input(
+            "Target customer (optional)",
+            placeholder="independent clinics, small finance teams, agencies...",
+        )
+        label_to_key = {label: key for key, label in WEB_SOURCE_LABELS.items()}
+        selected_labels = st.multiselect(
+            "Public sources",
+            list(label_to_key),
+            default=[
+                WEB_SOURCE_LABELS["forums"],
+                WEB_SOURCE_LABELS["issues"],
+                WEB_SOURCE_LABELS["reviews"],
+            ],
+        )
+        result_limit = st.number_input(
+            "Maximum sources", min_value=1, max_value=100, value=15
+        )
+        web_submitted = st.form_submit_button(
+            "Find customer discussions",
+            type="primary",
+            use_container_width=True,
+            disabled=not settings.search_ready,
+        )
+    if not settings.search_ready:
+        st.info(
+            "Configure Tavily in Settings for live public-web discovery, or "
+            "enable Demo mode to try the workflow offline."
+        )
+    if web_submitted:
+        try:
+            with st.status("Searching public sources", expanded=True) as status:
+                status.write("Building evidence-oriented search queries")
+                service = WebEvidenceDiscoveryService(
+                    build_search_provider(settings),
+                    search_depth=settings.search_depth,
+                )
+                status.write("Searching and deduplicating attributable results")
+                candidates = service.discover(
+                    topic,
+                    target_customer=target_customer or None,
+                    source_types=tuple(
+                        label_to_key[label] for label in selected_labels
+                    ),
+                    max_results=int(result_limit),
+                )
+                st.session_state["web-evidence-candidates"] = candidates
+                status.update(
+                    label=f"Found {len(candidates)} source(s)",
+                    state="complete",
+                    expanded=False,
+                )
+        except (IngestionError, SearchProviderError) as exc:
+            st.error(f"Public web discovery could not complete: {exc}")
+    web_candidates = st.session_state.get("web-evidence-candidates")
+    if web_candidates is not None:
+        _render_web_candidates(
+            web_candidates,
+            discovery_ready=settings.discovery_ready,
+            SessionFactory=SessionFactory,
+        )
+
+
 def main() -> None:
     """Render the Discover page."""
 
@@ -217,7 +436,7 @@ def main() -> None:
     configure_page("Discover", settings)
     page_header(
         "Discover",
-        "Turn a real customer discussion into structured, scoreable problem evidence.",
+        "Find sourced customer pain and turn it into ranked market opportunities.",
         eyebrow="Evidence intake",
     )
     SessionFactory = get_ui_session_factory(settings.database_url)
@@ -235,72 +454,23 @@ def main() -> None:
         )
 
     web_tab, manual_tab, csv_tab, reddit_tab = st.tabs(
-        ["Web search", "Paste discussion", "Upload CSV", "Reddit"]
+        ["Opportunity scout", "Paste discussion", "Upload CSV", "Reddit"]
     )
     with web_tab:
-        with st.form("web-discovery"):
-            topic = st.text_input(
-                "Market, workflow, or problem",
-                placeholder="patient referral follow-up, vendor renewals, manual invoicing...",
+        discovery_mode = st.segmented_control(
+            "Discovery mode",
+            ["Scout for me", "Search a topic"],
+            default="Scout for me",
+            label_visibility="collapsed",
+        )
+        if discovery_mode == "Search a topic":
+            _render_topic_search(
+                settings=settings,
+                SessionFactory=SessionFactory,
             )
-            target_customer = st.text_input(
-                "Target customer (optional)",
-                placeholder="independent clinics, small finance teams, agencies...",
-            )
-            label_to_key = {label: key for key, label in WEB_SOURCE_LABELS.items()}
-            selected_labels = st.multiselect(
-                "Public sources",
-                list(label_to_key),
-                default=[
-                    WEB_SOURCE_LABELS["forums"],
-                    WEB_SOURCE_LABELS["issues"],
-                    WEB_SOURCE_LABELS["reviews"],
-                ],
-            )
-            result_limit = st.number_input(
-                "Maximum sources", min_value=1, max_value=100, value=15
-            )
-            web_submitted = st.form_submit_button(
-                "Find customer discussions",
-                type="primary",
-                use_container_width=True,
-                disabled=not settings.search_ready,
-            )
-        if not settings.search_ready:
-            st.info(
-                "Configure Tavily in Settings for live public-web discovery, or "
-                "enable Demo mode to try the workflow offline."
-            )
-        if web_submitted:
-            try:
-                with st.status("Searching public sources", expanded=True) as status:
-                    status.write("Building evidence-oriented search queries")
-                    service = WebEvidenceDiscoveryService(
-                        build_search_provider(settings),
-                        search_depth=settings.search_depth,
-                    )
-                    status.write("Searching and deduplicating attributable results")
-                    candidates = service.discover(
-                        topic,
-                        target_customer=target_customer or None,
-                        source_types=tuple(
-                            label_to_key[label] for label in selected_labels
-                        ),
-                        max_results=int(result_limit),
-                    )
-                    st.session_state["web-evidence-candidates"] = candidates
-                    status.update(
-                        label=f"Found {len(candidates)} source(s)",
-                        state="complete",
-                        expanded=False,
-                    )
-            except (IngestionError, SearchProviderError) as exc:
-                st.error(f"Public web discovery could not complete: {exc}")
-        web_candidates = st.session_state.get("web-evidence-candidates")
-        if web_candidates is not None:
-            _render_web_candidates(
-                web_candidates,
-                discovery_ready=settings.discovery_ready,
+        else:
+            _render_opportunity_scout(
+                settings=settings,
                 SessionFactory=SessionFactory,
             )
 
