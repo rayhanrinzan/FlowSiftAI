@@ -6,7 +6,7 @@ import builtins
 import importlib
 
 
-RUNTIME_VERSION = 6
+RUNTIME_VERSION = 7
 
 
 def ensure_runtime_current() -> None:
