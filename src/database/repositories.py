@@ -87,6 +87,18 @@ class EvidenceRepository:
         )
         return list(self.session.execute(statement).scalars())
 
+    def list_source_urls(self) -> list[str]:
+        """Return every stored non-empty source URL for search deduplication."""
+
+        statement = select(EvidenceItem.source_url).where(
+            EvidenceItem.source_url.is_not(None)
+        )
+        return [
+            source_url
+            for source_url in self.session.execute(statement).scalars()
+            if source_url
+        ]
+
     def list_visible_recent(self, limit: int = 20) -> list[EvidenceItem]:
         """Return recent evidence without fake or local source URLs."""
 
@@ -207,6 +219,42 @@ class ClusterRepository:
             )
             >= 2
         ][:limit]
+
+    def list_pipeline(self, limit: int = 1000) -> list[OpportunityCluster]:
+        """Return every real-source problem signal visible in the product pipeline."""
+
+        statement = (
+            select(OpportunityCluster)
+            .options(
+                selectinload(OpportunityCluster.scores),
+                selectinload(OpportunityCluster.evidence_links).selectinload(
+                    ClusterEvidence.evidence_item
+                ),
+                selectinload(OpportunityCluster.competitors),
+            )
+            .order_by(OpportunityCluster.updated_at.desc())
+        )
+        clusters = list(self.session.execute(statement).scalars())
+        visible: list[OpportunityCluster] = []
+        for cluster in clusters:
+            evidence_items = [
+                link.evidence_item
+                for link in cluster.evidence_links
+                if link.evidence_item.contains_problem
+                and not is_placeholder_source_url(link.evidence_item.source_url)
+            ]
+            if not evidence_items:
+                continue
+            scout_candidate = all(
+                (item.metadata_json or {}).get("scout_segment")
+                for item in evidence_items
+            )
+            if cluster.status == "archived" and not scout_candidate:
+                continue
+            visible.append(cluster)
+            if len(visible) >= limit:
+                break
+        return visible
 
     def save(self, cluster: OpportunityCluster) -> OpportunityCluster:
         """Persist changes to a cluster summary."""

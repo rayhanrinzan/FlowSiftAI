@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from math import ceil
+import re
 from urllib.parse import urlsplit
 
 from src.ingestion.manual import IngestionError, build_source_external_id
@@ -15,6 +16,19 @@ from src.research.schemas import SearchResult
 
 
 MAX_EVIDENCE_TEXT_CHARS = 20_000
+
+SOURCE_PAGE_BOILERPLATE = (
+    "Skip to main content",
+    "Open menu",
+    "Open navigation",
+    "Go to Reddit Home",
+    "Get the Reddit app",
+    "Get App",
+    "Log in to Reddit",
+    "Log In",
+    "Expand user menu",
+    "Open settings menu",
+)
 
 WEB_SOURCE_LABELS: dict[str, str] = {
     "forums": "Forums & communities",
@@ -193,10 +207,11 @@ def candidate_from_search_result(
     url = result.url.strip()
     if not url.startswith(("http://", "https://")):
         return None
-    raw_text = (result.content or result.snippet).strip()
+    raw_text = _clean_source_text(result.content or result.snippet)
     if not raw_text:
         return None
     raw_text = raw_text[:MAX_EVIDENCE_TEXT_CHARS].rstrip()
+    snippet = _clean_source_text(result.snippet)
     domain = urlsplit(url).netloc.lower().removeprefix("www.")
     if not domain:
         return None
@@ -205,7 +220,18 @@ def candidate_from_search_result(
         url=url,
         domain=domain,
         raw_text=raw_text,
-        snippet=result.snippet.strip(),
+        snippet=snippet,
         score=float(result.score),
         source_queries=(query,),
     )
+
+
+def _clean_source_text(value: str | None) -> str:
+    """Remove common search-indexed page chrome from public discussion text."""
+
+    text = str(value or "")
+    for phrase in SOURCE_PAGE_BOILERPLATE:
+        text = text.replace(phrase, " ")
+    text = re.sub(r"(?:^|\s)#{1,6}\s*", " ", text)
+    text = re.sub(r"\bTitle:\s*", "", text, flags=re.IGNORECASE)
+    return " ".join(text.split())

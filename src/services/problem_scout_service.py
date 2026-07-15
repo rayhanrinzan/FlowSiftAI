@@ -173,6 +173,118 @@ SCOUT_RELEVANCE_TERMS: dict[str, tuple[str, ...]] = {
     "regulated-businesses": ("compliance", "regulated", "audit", "regulation"),
 }
 
+SCOUT_SEARCH_LENSES: tuple[str, ...] = (
+    "manual takes hours frustrating reddit",
+    "spreadsheet repetitive errors forum",
+    "scaling backlog overwhelmed reddit",
+    "copy paste missed follow up workaround",
+    "expensive software still doing work manually review",
+    "tracking coordination wish there was a better way forum",
+)
+
+SCOUT_WORKFLOW_TOPICS: dict[str, tuple[str, ...]] = {
+    "clinic-operations": (
+        "patient referral follow up",
+        "insurance authorization tracking",
+        "patient intake paperwork",
+        "appointment reminder coordination",
+    ),
+    "accounting-firms": (
+        "chasing client documents",
+        "month end reconciliation",
+        "invoice and payment follow up",
+        "bookkeeping data entry",
+    ),
+    "property-management": (
+        "maintenance request coordination",
+        "tenant communication",
+        "vendor scheduling follow up",
+        "inspection tracking",
+    ),
+    "ecommerce-operations": (
+        "order tracking customer emails",
+        "returns refunds exceptions",
+        "inventory fulfillment reconciliation",
+        "supplier purchase order coordination",
+    ),
+    "recruiting-teams": (
+        "interview feedback reminders",
+        "candidate scheduling",
+        "applicant screening backlog",
+        "offer approval coordination",
+    ),
+    "therapy-practices": (
+        "client intake paperwork",
+        "insurance billing follow up",
+        "appointment scheduling reminders",
+        "clinical note administration",
+    ),
+    "marketing-agencies": (
+        "client content approvals",
+        "campaign reporting",
+        "asset and feedback tracking",
+        "scope change requests",
+    ),
+    "construction-teams": (
+        "change order tracking",
+        "subcontractor scheduling",
+        "jobsite progress updates",
+        "invoice approval coordination",
+    ),
+    "distributors": (
+        "purchase order tracking",
+        "inventory discrepancy reconciliation",
+        "customer order status",
+        "supplier follow up",
+    ),
+    "small-hr-teams": (
+        "employee onboarding tasks",
+        "leave request tracking",
+        "performance review reminders",
+        "policy acknowledgement tracking",
+    ),
+    "insurance-brokers": (
+        "policy renewal follow up",
+        "carrier quote comparison",
+        "client document collection",
+        "claims status communication",
+    ),
+    "field-service-businesses": (
+        "technician scheduling dispatch",
+        "customer appointment updates",
+        "service quote follow up",
+        "job completion paperwork",
+    ),
+    "manufacturers": (
+        "production schedule tracking",
+        "quality issue reporting",
+        "supplier delivery follow up",
+        "inventory material planning",
+    ),
+    "dental-practices": (
+        "insurance verification",
+        "patient recall follow up",
+        "treatment plan coordination",
+        "appointment cancellation filling",
+    ),
+    "regulated-businesses": (
+        "compliance evidence collection",
+        "audit preparation tracking",
+        "policy review reminders",
+        "regulatory reporting workflow",
+    ),
+}
+
+GENERIC_WORKFLOW_TERMS = {
+    "client",
+    "customer",
+    "employee",
+    "patient",
+    "supplier",
+    "tenant",
+    "vendor",
+}
+
 FIRST_HAND_MARKERS = (" i ", " i'm ", " i've ", " my ", " we ", " we're ", " our ")
 FIRST_HAND_PAIN_MARKERS = (
     "manual",
@@ -191,6 +303,28 @@ FIRST_HAND_PAIN_MARKERS = (
     "problem",
     "painful",
 )
+OPERATIONAL_PAIN_MARKERS = (
+    "manual",
+    "manually",
+    "spreadsheet",
+    "excel",
+    "copy-paste",
+    "copy paste",
+    "takes hours",
+    "hours every",
+    "every day",
+    "every week",
+    "repetitive",
+    "backlog",
+    "overwhelmed",
+    "missed",
+    "errors",
+    "expensive",
+    "slow",
+    "tracking",
+    "follow-up",
+    "follow up",
+)
 SOLICITATION_MARKERS = (
     "doing some research",
     "would love to hear",
@@ -203,6 +337,15 @@ SOLICITATION_MARKERS = (
     "offer my help",
     "book a demo",
     "dm me",
+    "case study",
+    "reviews reveal",
+    "analyzed thousands",
+    "analysed thousands",
+    "real problems worth solving",
+    "people i talked to",
+    "person i talked to",
+    "direct quote from",
+    "market research",
 )
 
 
@@ -238,6 +381,8 @@ class ProblemScoutRun:
     segments: tuple[CustomerSegment, ...]
     outcomes: tuple[ProblemScoutOutcome, ...]
     opportunities: tuple["DiscoveredOpportunity", ...]
+    previously_seen_count: int = 0
+    search_query_count: int = 0
 
     @property
     def accepted_count(self) -> int:
@@ -252,7 +397,13 @@ class ProblemScoutRun:
 
     @property
     def duplicate_count(self) -> int:
-        return sum(outcome.result.duplicate for outcome in self.outcomes)
+        return self.previously_seen_count + sum(
+            outcome.result.duplicate for outcome in self.outcomes
+        )
+
+    @property
+    def new_source_count(self) -> int:
+        return sum(not outcome.result.duplicate for outcome in self.outcomes)
 
 
 @dataclass(frozen=True)
@@ -309,14 +460,30 @@ def select_customer_segments(
     return tuple(rotated[:limit])
 
 
-def build_problem_query(segment: CustomerSegment) -> str:
-    """Build a broad query for first-hand pain, workarounds, and repeated work."""
+def build_problem_query(
+    segment: CustomerSegment,
+    *,
+    scan_round: int = 0,
+    attempt: int = 0,
+) -> str:
+    """Build a rotating natural-language query for first-hand workflow pain."""
 
-    query = (
-        f"{segment.search_terms} first hand customer complaint "
-        "manual repetitive workaround spreadsheet follow-up hours frustrating"
-    )
+    topic = _workflow_topic(segment, scan_round=scan_round, attempt=attempt)
+    lens = SCOUT_SEARCH_LENSES[
+        ((scan_round * 2) + attempt) % len(SCOUT_SEARCH_LENSES)
+    ]
+    query = f"{segment.search_terms} {topic} {lens}"
     return " ".join(query.split())
+
+
+def _workflow_topic(
+    segment: CustomerSegment,
+    *,
+    scan_round: int,
+    attempt: int,
+) -> str:
+    topics = SCOUT_WORKFLOW_TOPICS[segment.key]
+    return topics[(scan_round + attempt) % len(topics)]
 
 
 def _matches_segment(
@@ -329,10 +496,25 @@ def _matches_segment(
     return any(term in text for term in SCOUT_RELEVANCE_TERMS[segment.key])
 
 
+def _matches_workflow(evidence: WebEvidenceCandidate, topic: str) -> bool:
+    """Require a result to mention multiple terms from the searched workflow."""
+
+    text = " ".join((evidence.title, evidence.snippet)).lower()
+    text_terms = {
+        token[:-1] if token.endswith("s") and len(token) > 4 else token
+        for token in re.findall(r"[a-z0-9]+", text)
+    }
+    topic_terms = {
+        (token[:-1] if token.endswith("s") and len(token) > 4 else token)
+        for token in re.findall(r"[a-z0-9]+", topic.lower())
+        if len(token) >= 4 and token not in GENERIC_WORKFLOW_TERMS
+    }
+    return len(topic_terms & text_terms) >= min(2, len(topic_terms))
+
+
 def _contains_first_hand_problem(evidence: WebEvidenceCandidate) -> bool:
-    text = " ".join(
-        (evidence.title, evidence.raw_text[:3_000], evidence.snippet)
-    ).lower()
+    excerpt = evidence.snippet or evidence.raw_text[:3_000]
+    text = " ".join((evidence.title, excerpt)).lower()
     padded = f" {text} "
     if any(marker in padded for marker in SOLICITATION_MARKERS):
         return False
@@ -340,11 +522,16 @@ def _contains_first_hand_problem(evidence: WebEvidenceCandidate) -> bool:
         f" {sentence.strip()} "
         for sentence in re.split(r"(?<=[.!?])\s+|\n+", padded)
     ]
-    return any(
+    same_sentence_signal = any(
         any(subject in sentence for subject in FIRST_HAND_MARKERS)
-        and any(pain in sentence for pain in FIRST_HAND_PAIN_MARKERS)
+        and any(pain in sentence for pain in OPERATIONAL_PAIN_MARKERS)
         for sentence in sentences
     )
+    if same_sentence_signal:
+        return True
+    first_hand = any(marker in padded for marker in FIRST_HAND_MARKERS)
+    pain_signal_count = sum(marker in padded for marker in FIRST_HAND_PAIN_MARKERS)
+    return first_hand and pain_signal_count >= 2
 
 
 class ProblemScoutService:
@@ -381,6 +568,7 @@ class ProblemScoutService:
         segment_limit: int = 4,
         results_per_segment: int = 2,
         offset: int = 0,
+        scan_round: int = 0,
         progress_callback: Callable[[float, str], None] | None = None,
     ) -> ProblemScoutRun:
         """Run one complete search-to-database discovery cycle."""
@@ -392,9 +580,11 @@ class ProblemScoutService:
             limit=segment_limit,
             offset=offset,
         )
-        sources = self._search_sources(
+        self._restore_scout_candidates()
+        sources, previously_seen_count, search_query_count = self._search_sources(
             segments,
             results_per_segment=results_per_segment,
+            scan_round=scan_round,
             progress_callback=progress_callback,
         )
         outcomes: list[ProblemScoutOutcome] = []
@@ -410,8 +600,8 @@ class ProblemScoutService:
             outcomes.append(ProblemScoutOutcome(source=source, result=result))
             cluster_ids = self._cluster_ids_for_result(result)
             touched_cluster_ids.update(cluster_ids)
-            if result.assignment and result.assignment.created:
-                self._hide_uncorroborated_cluster(result.assignment.cluster.id)
+            for cluster_id in cluster_ids:
+                self._mark_pipeline_stage(cluster_id)
 
         opportunities = self._promote_opportunities(
             touched_cluster_ids,
@@ -430,6 +620,8 @@ class ProblemScoutService:
             segments=segments,
             outcomes=tuple(outcomes),
             opportunities=tuple(opportunities),
+            previously_seen_count=previously_seen_count,
+            search_query_count=search_query_count,
         )
 
     def _search_sources(
@@ -437,10 +629,16 @@ class ProblemScoutService:
         segments: tuple[CustomerSegment, ...],
         *,
         results_per_segment: int,
+        scan_round: int,
         progress_callback: Callable[[float, str], None] | None,
-    ) -> list[SourcedDiscussion]:
-        seen_urls: set[str] = set()
+    ) -> tuple[list[SourcedDiscussion], int, int]:
+        stored_urls = {
+            canonical_url(url) for url in self.discovery.evidence.list_source_urls()
+        }
+        seen_urls: set[str] = set(stored_urls)
+        previously_seen_urls: set[str] = set()
         sources: list[SourcedDiscussion] = []
+        query_count = 0
         total = max(1, len(segments))
         for index, segment in enumerate(segments, start=1):
             if progress_callback:
@@ -448,30 +646,52 @@ class ProblemScoutService:
                     (index - 1) / total * 0.4,
                     f"Searching public discussions for {segment.label}",
                 )
-            query = build_problem_query(segment)
-            results = self.provider.search(
-                query,
-                max_results=results_per_segment,
-                search_depth=self.search_depth,
-            )
-            for result in results:
-                evidence = candidate_from_search_result(result, query=query)
-                if evidence is None:
-                    continue
-                if not is_public_source_url(evidence.url):
-                    continue
-                if not is_supported_discussion_url(evidence.url):
-                    continue
-                if not _matches_segment(evidence, segment):
-                    continue
-                if not _contains_first_hand_problem(evidence):
-                    continue
-                url_key = canonical_url(evidence.url)
-                if url_key in seen_urls:
-                    continue
-                seen_urls.add(url_key)
-                sources.append(SourcedDiscussion(evidence=evidence, segment=segment))
-        return sources
+            segment_source_count = 0
+            for attempt in range(3):
+                query = build_problem_query(
+                    segment,
+                    scan_round=scan_round,
+                    attempt=attempt,
+                )
+                workflow_topic = _workflow_topic(
+                    segment,
+                    scan_round=scan_round,
+                    attempt=attempt,
+                )
+                query_count += 1
+                results = self.provider.search(
+                    query,
+                    max_results=results_per_segment,
+                    search_depth=self.search_depth,
+                )
+                for result in results:
+                    evidence = candidate_from_search_result(result, query=query)
+                    if evidence is None:
+                        continue
+                    if not is_public_source_url(evidence.url):
+                        continue
+                    if not is_supported_discussion_url(evidence.url):
+                        continue
+                    if not _matches_segment(evidence, segment):
+                        continue
+                    url_key = canonical_url(evidence.url)
+                    if url_key in stored_urls:
+                        previously_seen_urls.add(url_key)
+                        continue
+                    if url_key in seen_urls:
+                        continue
+                    if not _matches_workflow(evidence, workflow_topic):
+                        continue
+                    if not _contains_first_hand_problem(evidence):
+                        continue
+                    seen_urls.add(url_key)
+                    sources.append(
+                        SourcedDiscussion(evidence=evidence, segment=segment)
+                    )
+                    segment_source_count += 1
+                if segment_source_count >= 2:
+                    break
+        return sources, len(previously_seen_urls), query_count
 
     def _cluster_ids_for_result(self, result: DiscoveryResult) -> set[str]:
         if not result.accepted:
@@ -480,15 +700,64 @@ class ProblemScoutService:
             return {result.assignment.cluster.id}
         return set(self.clusters.cluster_ids_for_evidence(result.evidence.id))
 
-    def _hide_uncorroborated_cluster(self, cluster_id: str) -> None:
+    def _mark_pipeline_stage(self, cluster_id: str) -> None:
         cluster = self.clusters.get(cluster_id)
         if (
             cluster is not None
             and cluster.independent_source_count < self.minimum_independent_sources
             and self._is_scout_only(cluster)
+            and cluster.status != "researched"
         ):
-            cluster.status = "archived"
+            cluster.status = "candidate"
+            self._refresh_candidate_identity(cluster)
             self.clusters.save(cluster)
+
+    def _restore_scout_candidates(self) -> None:
+        """Bring one-source scout records created by older releases into the pipeline."""
+
+        for cluster in self.clusters.list_with_evidence(limit=10_000):
+            if (
+                cluster.independent_source_count < self.minimum_independent_sources
+                and self._is_scout_only(cluster)
+                and cluster.status != "researched"
+            ):
+                if cluster.status == "archived":
+                    cluster.status = "candidate"
+                self._refresh_candidate_identity(cluster)
+                self.clusters.save(cluster)
+
+    @staticmethod
+    def _refresh_candidate_identity(cluster: OpportunityCluster) -> None:
+        """Use scout metadata and source titles to label an early pipeline signal."""
+
+        items = [link.evidence_item for link in cluster.evidence_links]
+        if not cluster.target_customer:
+            cluster.target_customer = next(
+                (
+                    str((item.metadata_json or {}).get("scout_segment_label"))
+                    for item in items
+                    if (item.metadata_json or {}).get("scout_segment_label")
+                ),
+                None,
+            )
+
+        source_title = next(
+            (
+                item.title
+                for item in items
+                if item.title and "heart of the internet" not in item.title.lower()
+            ),
+            None,
+        )
+        candidate = source_title or cluster.problem_summary
+        cleaned = re.sub(r"(?:^|\s)#{1,6}\s*", " ", candidate)
+        cleaned = re.sub(r"\s*:\s*r/[A-Za-z0-9_]+.*$", "", cleaned)
+        cleaned = cleaned.replace("Skip to main content", " ")
+        cleaned = " ".join(cleaned.split()).strip(" .:-")
+        if cleaned:
+            cluster.title = (
+                f"{cleaned[:87].rstrip()}..." if len(cleaned) > 90 else cleaned
+            )
 
     def _promote_opportunities(
         self,
@@ -525,7 +794,7 @@ class ProblemScoutService:
                 or draft.confidence < self.minimum_synthesis_confidence
             ):
                 if cluster.status != "researched" and self._is_scout_only(cluster):
-                    cluster.status = "archived"
+                    cluster.status = "candidate"
                     self.clusters.save(cluster)
                 continue
 
@@ -534,7 +803,9 @@ class ProblemScoutService:
             cluster.target_customer = draft.target_customer
             cluster.current_workaround = draft.current_workaround
             cluster.proposed_solution = draft.proposed_solution
-            if cluster.status == "archived" and self._is_scout_only(cluster):
+            if cluster.status in {"archived", "candidate"} and self._is_scout_only(
+                cluster
+            ):
                 cluster.status = "new"
             self.clusters.save(cluster)
             score = self.discovery.scorer.score_cluster(cluster.id)

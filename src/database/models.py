@@ -48,6 +48,7 @@ class RelationshipType(str, Enum):
 class OpportunityStatus(str, Enum):
     """Lifecycle status for an opportunity cluster."""
 
+    CANDIDATE = "candidate"
     NEW = "new"
     RESEARCHED = "researched"
     ARCHIVED = "archived"

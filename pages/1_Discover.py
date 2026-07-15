@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import importlib
+
 import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
+
+from src import runtime as _runtime
+
+_runtime = importlib.reload(_runtime)
+_runtime.ensure_runtime_current()
 
 from src.clustering.embeddings import EmbeddingError
 from src.config import Settings, get_settings
@@ -76,21 +83,19 @@ def _render_result(result: DiscoveryResult) -> None:
         confidence.metric(
             "Confidence score", format_score(result.score.confidence_score)
         )
-        if (
-            result.assignment.cluster.independent_source_count >= 2
-            and result.assignment.cluster.status != "archived"
-            and st.button(
-                "Open this opportunity",
-                key=f"open-ingested-{result.assignment.cluster.id}",
-                type="primary",
-            )
+        corroborated = result.assignment.cluster.independent_source_count >= 2
+        if st.button(
+            "Open this opportunity" if corroborated else "Open saved signal",
+            key=f"open-ingested-{result.assignment.cluster.id}",
+            type="primary",
         ):
             st.session_state["selected_cluster_id"] = result.assignment.cluster.id
             st.switch_page("pages/3_Opportunity_Details.py")
-        elif result.assignment.cluster.independent_source_count < 2:
+        if not corroborated:
             st.info(
-                "This evidence is saved. One more independent discussion supporting "
-                "the same problem is required before it becomes an opportunity."
+                "This signal is now visible throughout the product. One more "
+                "independent discussion supporting the same problem will promote it "
+                "to a confirmed opportunity."
             )
     else:
         st.warning(
@@ -318,15 +323,71 @@ def _render_scout_run(run: ProblemScoutRun) -> None:
     """Render promoted leads or an honest no-corroboration result."""
 
     st.caption(
-        f"{len(run.outcomes)} public discussions processed | "
+        f"{run.new_source_count} new public discussion(s) processed | "
         f"{run.accepted_count} contained usable problem evidence | "
-        f"{run.duplicate_count} already stored"
+        f"{run.duplicate_count} previously seen skipped | "
+        f"{run.search_query_count} searches run"
     )
+    if not run.outcomes:
+        st.info(
+            "Scan complete. No new qualifying discussions were found in this "
+            "batch, and previously stored sources were not replayed as new results. "
+            "Run the next batch to rotate into different markets and workflows."
+        )
+        render_page_link(
+            "pages/2_Opportunities.py",
+            label="View existing opportunity pipeline",
+            route="/Opportunities",
+            use_container_width=False,
+        )
+        return
     if not run.opportunities:
         st.warning(
             "No repeated problem was supported by at least two independent public "
-            "discussions in this batch. The evidence was saved, but FlowSift AI did "
-            "not invent an opportunity from one-off or weakly aligned results."
+            "discussions in this batch. New evidence is still visible as a signal "
+            "throughout the product, but it is not labeled a confirmed opportunity."
+        )
+
+        accepted = [
+            outcome
+            for outcome in run.outcomes
+            if outcome.result.accepted and outcome.result.assignment is not None
+        ]
+        if accepted:
+            section_header(
+                "New signals saved",
+                "These findings now appear on Overview, Opportunities, and Opportunity details.",
+            )
+            shown_clusters: set[str] = set()
+            for outcome in accepted:
+                assignment = outcome.result.assignment
+                if assignment is None or assignment.cluster.id in shown_clusters:
+                    continue
+                shown_clusters.add(assignment.cluster.id)
+                with st.container(border=True):
+                    title, action = st.columns([4, 1])
+                    title.markdown(
+                        f"**{outcome.result.extraction.problem_statement or outcome.source.evidence.title}**"
+                    )
+                    title.caption(outcome.source.segment.label)
+                    action.link_button(
+                        "Open source",
+                        outcome.source.evidence.url,
+                        use_container_width=True,
+                    )
+                    if st.button(
+                        "Open signal details",
+                        key=f"open-signal-{assignment.cluster.id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["selected_cluster_id"] = assignment.cluster.id
+                        st.switch_page("pages/3_Opportunity_Details.py")
+
+        render_page_link(
+            "pages/2_Opportunities.py",
+            label="View opportunity pipeline",
+            route="/Opportunities",
+            use_container_width=False,
         )
         return
 
@@ -361,7 +422,8 @@ def _render_opportunity_scout(
     stored_focus = st.session_state.get("problem-scout-focus")
     has_results = stored_focus == focus and "problem-scout-run" in st.session_state
     scan_submitted = st.button(
-        "Scan another batch" if has_results else "Scan for opportunities",
+        "Scan next batch" if has_results else "Scan for opportunities",
+        key=f"problem-scout-scan-{focus}",
         type="primary",
         use_container_width=True,
         disabled=not _live_scout_ready(settings),
@@ -400,6 +462,7 @@ def _render_opportunity_scout(
                         segment_limit=4,
                         results_per_segment=8,
                         offset=scan_index * 4,
+                        scan_round=scan_index,
                         progress_callback=update_progress,
                     )
                 clear_ui_data_caches()
@@ -408,8 +471,8 @@ def _render_opportunity_scout(
                 st.session_state[scan_index_key] = scan_index + 1
                 status.update(
                     label=(
-                        f"Found {len(run.opportunities)} corroborated opportunity lead(s) "
-                        f"from {len(run.outcomes)} public discussion(s)"
+                        f"Saved {run.new_source_count} new source(s); found "
+                        f"{len(run.opportunities)} confirmed opportunity lead(s)"
                     ),
                     state="complete",
                     expanded=False,

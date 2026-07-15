@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import importlib
+
 import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
+
+from src import runtime as _runtime
+
+_runtime = importlib.reload(_runtime)
+_runtime.ensure_runtime_current()
 
 from src.config import get_settings
 from src.services.opportunity_service import RankedOpportunity
@@ -45,16 +52,19 @@ def _render_rows(rows: tuple[RankedOpportunity, ...]) -> None:
                         st.switch_page("pages/3_Opportunity_Details.py")
                     st.caption(
                         f"{row.target_customer or 'Target customer not established'} | "
-                        f"{row.evidence_count} evidence | "
+                        f"{row.independent_source_count} independent source(s) | "
                         f"{row.competitor_count} competitors"
+                    )
+                    stage_label = (
+                        "Needs corroboration"
+                        if row.pipeline_stage == "candidate"
+                        else "Confirmed opportunity"
                     )
                     state, updated = st.columns([1, 2])
                     state.markdown(
                         status_badge_html(
-                            row.research_status.replace("_", " ").title(),
-                            "good"
-                            if row.research_status == "researched"
-                            else "neutral",
+                            stage_label,
+                            "warn" if row.pipeline_stage == "candidate" else "good",
                         ),
                         unsafe_allow_html=True,
                     )
@@ -106,9 +116,9 @@ def main() -> None:
         first, second, third = st.columns(3)
         pain_options = sorted({pain for row in rows for pain in row.pain_types})
         pain_type = first.selectbox("Pain type", ["All", *pain_options])
-        statuses = sorted({row.research_status for row in rows})
+        statuses = sorted({row.pipeline_stage for row in rows})
         selected_statuses = second.multiselect(
-            "Research status", statuses, default=statuses
+            "Pipeline stage", statuses, default=statuses
         )
         start_date = third.date_input("Updated on or after", value=None)
 
@@ -119,7 +129,7 @@ def main() -> None:
         and (row.confidence_score or 0) >= minimum_confidence
         and (target_customer == "All" or row.target_customer == target_customer)
         and (pain_type == "All" or pain_type in row.pain_types)
-        and row.research_status in selected_statuses
+        and row.pipeline_stage in selected_statuses
         and (
             start_date is None
             or row.last_updated is None
@@ -128,8 +138,8 @@ def main() -> None:
     ]
 
     section_header(
-        "Ranked results",
-        f"{len(filtered)} of {len(rows)} opportunities match the current view.",
+        "Ranked pipeline",
+        f"{len(filtered)} of {len(rows)} problem signals match the current view.",
     )
     sort_column, direction_column, size_column = st.columns([3, 1, 1])
     sort_key = sort_column.selectbox(

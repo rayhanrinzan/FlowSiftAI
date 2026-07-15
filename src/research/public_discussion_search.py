@@ -284,6 +284,21 @@ def _plain_query(query: str) -> str:
     if "first hand customer complaint" in cleaned.lower():
         segment_anchor = cleaned.split()[0]
         return f"{segment_anchor} spreadsheet"
+    lowered = cleaned.lower()
+    scout_lens_starts = (
+        "manual takes hours",
+        "spreadsheet repetitive",
+        "scaling backlog",
+        "copy paste missed",
+        "expensive software",
+        "tracking coordination wish",
+    )
+    lens_positions = [
+        lowered.find(lens) for lens in scout_lens_starts if lens in lowered
+    ]
+    if lens_positions:
+        workflow_tokens = cleaned[: min(lens_positions)].split()
+        return " ".join(workflow_tokens[-4:])
     return cleaned[:180]
 
 
