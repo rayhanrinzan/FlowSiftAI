@@ -14,11 +14,14 @@ from src.ingestion.manual import (
     parse_csv_submissions,
 )
 from src.ingestion.reddit import RedditIngestionError, build_reddit_client
-from src.ingestion.web import (
+from src.ingestion.scout import (
     SCOUT_FOCUS_LABELS,
-    WEB_SOURCE_LABELS,
     AutomatedOpportunityScout,
+    ScoutedEvidenceCandidate,
     ScoutedOpportunity,
+)
+from src.ingestion.web import (
+    WEB_SOURCE_LABELS,
     WebEvidenceCandidate,
     WebEvidenceDiscoveryService,
 )
@@ -230,7 +233,7 @@ def _render_scout_leads(
         "Sourced opportunity leads",
         f"{len(leads)} workflows supported by {source_count} public source(s).",
     )
-    selected: list[WebEvidenceCandidate] = []
+    selected: list[ScoutedEvidenceCandidate] = []
     for lead in leads:
         with st.container(border=True):
             heading, evidence_count = st.columns([4, 1])

@@ -3,12 +3,15 @@
 import pytest
 
 from src.ingestion.manual import IngestionError
-from src.ingestion.web import (
+from src.ingestion.scout import (
     AutomatedOpportunityScout,
+    build_scout_query,
+    select_opportunity_themes,
+)
+from src.ingestion.web import (
     WebEvidenceDiscoveryService,
     candidate_from_search_result,
     generate_evidence_queries,
-    select_opportunity_themes,
 )
 from src.research.competitor_search import MockSearchProvider
 from src.research.schemas import SearchResult
@@ -57,12 +60,8 @@ def test_evidence_queries_require_topic_and_source() -> None:
 
 
 def test_automated_queries_use_broad_unquoted_terms() -> None:
-    query = generate_evidence_queries(
-        "patient referral follow-up",
-        target_customer="independent clinics",
-        source_types=("discussions",),
-        quote_terms=False,
-    )[0]
+    theme = select_opportunity_themes("healthcare", limit=1)[0]
+    query = build_scout_query(theme)
 
     assert '"patient referral follow-up"' not in query
     assert '"independent clinics"' not in query
@@ -155,8 +154,8 @@ def test_automated_scout_groups_attributable_evidence_without_a_prompt() -> None
     assert len({candidate.url for lead in leads for candidate in lead.candidates}) == 8
     for lead in leads:
         for candidate in lead.candidates:
-            assert candidate.theme_key == lead.theme.key
-            assert candidate.target_customer == lead.theme.target_customer
+            assert candidate.theme.key == lead.theme.key
+            assert candidate.theme.target_customer == lead.theme.target_customer
             submission = candidate.to_submission()
             assert submission.source_url == candidate.url
             assert submission.metadata_json["opportunity_theme"] == lead.theme.key
