@@ -175,28 +175,119 @@ class MockSearchProvider:
     def _evidence_results(query: str) -> list[SearchResult]:
         """Return attributable demo discussions for the web discovery workflow."""
 
-        if any(term in query for term in ("clinic", "patient", "referral")):
-            return [
-                SearchResult(
-                    title="Referral follow-up is eating our week",
-                    url="https://community.example/clinic-referral-follow-up",
-                    snippet=(
+        fixture_groups = (
+            (
+                ("clinic", "patient", "referral", "authorization"),
+                (
+                    (
+                        "Referral follow-up is eating our week",
+                        "https://community.example/clinic-referral-follow-up",
                         "As a clinic manager, we still use Excel for referral follow-up "
                         "every day. The manual process takes hours and missed reminders "
-                        "put patients at risk."
+                        "put patients at risk.",
+                        0.94,
                     ),
-                    score=0.94,
-                ),
-                SearchResult(
-                    title="Small practice intake workaround",
-                    url="https://issues.example/small-practice-intake",
-                    snippet=(
+                    (
+                        "Small practice intake workaround",
+                        "https://issues.example/small-practice-intake",
                         "Our staff copy-paste patient intake details between systems every "
-                        "week. It is repetitive, frustrating, and errors are easy to miss."
+                        "week. It is repetitive, frustrating, and errors are easy to miss.",
+                        0.86,
                     ),
-                    score=0.86,
                 ),
-            ]
+            ),
+            (
+                ("client document", "accounting", "content approval"),
+                (
+                    (
+                        "Month-end is mostly chasing client documents",
+                        "https://accounting.example/client-document-chasing",
+                        "Our accounting team spends hours every month emailing clients for "
+                        "missing statements. We track reminders in a spreadsheet and still "
+                        "discover missing files at the deadline.",
+                        0.93,
+                    ),
+                    (
+                        "A better way to track client requests",
+                        "https://community.example/client-request-tracker",
+                        "We copy every client request into a shared sheet and manually send "
+                        "follow-ups. The repetitive work is frustrating during tax season.",
+                        0.84,
+                    ),
+                ),
+            ),
+            (
+                (
+                    "maintenance request",
+                    "property manager",
+                    "change order",
+                    "technician",
+                ),
+                (
+                    (
+                        "Maintenance updates disappear across calls and texts",
+                        "https://property.example/maintenance-coordination",
+                        "Our property managers manually copy maintenance requests from "
+                        "emails and texts into a spreadsheet. Tenants call repeatedly "
+                        "because status updates are easy to miss.",
+                        0.92,
+                    ),
+                    (
+                        "Vendor follow-up takes hours every week",
+                        "https://community.example/property-vendor-follow-up",
+                        "Coordinating vendors, tenants, and owners takes hours every week. "
+                        "We wish there was one simple place for approvals and updates.",
+                        0.85,
+                    ),
+                ),
+            ),
+            (
+                ("return", "inventory", "purchase order", "warehouse"),
+                (
+                    (
+                        "Return exceptions live in three different systems",
+                        "https://commerce.example/return-exceptions",
+                        "Our ecommerce team copy-pastes return details between the help "
+                        "desk, store, and warehouse. Refund exceptions are manual and take "
+                        "hours to reconcile each week.",
+                        0.91,
+                    ),
+                    (
+                        "Inventory discrepancy spreadsheet keeps growing",
+                        "https://issues.example/inventory-reconciliation",
+                        "We reconcile inventory discrepancies in a shared spreadsheet every "
+                        "day. It is repetitive, frustrating, and stock errors delay orders.",
+                        0.83,
+                    ),
+                ),
+            ),
+            (
+                ("interview", "onboarding", "compliance training", "hiring"),
+                (
+                    (
+                        "Interview feedback still requires constant reminders",
+                        "https://recruiting.example/interview-feedback",
+                        "Our recruiters manually chase interview feedback in chat after "
+                        "every panel. Hiring decisions take days longer when one reviewer "
+                        "forgets to submit notes.",
+                        0.9,
+                    ),
+                    (
+                        "Onboarding handoffs are difficult to track",
+                        "https://community.example/onboarding-handoffs",
+                        "We coordinate onboarding through email and a spreadsheet. The same "
+                        "reminders are sent every week and missed tasks frustrate new hires.",
+                        0.82,
+                    ),
+                ),
+            ),
+        )
+        for keywords, fixtures in fixture_groups:
+            if any(keyword in query for keyword in keywords):
+                return [
+                    SearchResult(title=title, url=url, snippet=snippet, score=score)
+                    for title, url, snippet, score in fixtures
+                ]
         return [
             SearchResult(
                 title="Operations workflow still depends on spreadsheets",
@@ -207,17 +298,7 @@ class MockSearchProvider:
                     "simpler tool."
                 ),
                 score=0.91,
-            ),
-            SearchResult(
-                title="Recurring handoffs are difficult to track",
-                url="https://issues.example/recurring-handoffs",
-                snippet=(
-                    "Our operations team manually coordinates handoffs through inbox "
-                    "reminders every day. The repetitive work is frustrating and missed "
-                    "updates create risk."
-                ),
-                score=0.83,
-            ),
+            )
         ]
 
     @staticmethod

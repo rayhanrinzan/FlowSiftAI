@@ -101,15 +101,17 @@ The launcher initializes whichever database is named in `.env` before starting t
 ### 5. Create the first real opportunity
 
 1. Open **Discover**.
-2. Choose **Web search** and enter a market, workflow, or problem worth investigating.
-3. Search public forums, issue trackers, review sites, or the broader web.
-4. Open promising sources, select credible first-hand discussions, and extract them.
-5. Use **Paste discussion** for individual interview notes, support messages, sales-call notes, or public discussions you already have.
-6. Use **Upload CSV** for customer-owned exports such as support tickets, survey responses, cancellation feedback, interview transcripts, and CRM notes.
-7. Review whether the evidence was accepted or rejected in **Extraction review**.
-8. Open **Opportunities** to see the resulting clusters and scores.
-9. Open an opportunity, then click **Research competitors** to run Tavily search and OpenAI classification.
-10. Inspect **Evidence**, **Competitors**, and **Scoring** before treating the opportunity as validated.
+2. Leave **Scout for me** and **Any market** selected.
+3. Click **Scan for opportunities**. No idea or search prompt is required.
+4. Review the automatically sourced workflow leads and their original public sources.
+5. Leave credible sources selected and click **Build opportunities from selected sources**.
+6. Use **Search a topic** only when you already have a market or workflow to investigate.
+7. Use **Paste discussion** for individual interview notes, support messages, sales-call notes, or public discussions you already have.
+8. Use **Upload CSV** for customer-owned exports such as support tickets, survey responses, cancellation feedback, interview transcripts, and CRM notes.
+9. Review whether the evidence was accepted or rejected in **Extraction review**.
+10. Open **Opportunities** to see the resulting clusters and scores.
+11. Open an opportunity, then click **Research competitors** to run Tavily search and OpenAI classification.
+12. Inspect **Evidence**, **Competitors**, and **Scoring** before treating the opportunity as validated.
 
 ## How to Use Every Page
 
@@ -130,7 +132,11 @@ Click an opportunity title to open its full details.
 
 Use **Discover** to add source evidence.
 
-**Web search** finds public customer-pain evidence without Reddit. Enter a market, workflow, or problem and optionally name the target customer. Search results can come from:
+**Opportunity scout** is the default discovery workflow. Click **Scan for opportunities** without entering an idea. FlowSift AI rotates through concrete customer workflows across healthcare, professional services, property and field services, commerce and supply chain, and people operations. Choose a market focus only when useful.
+
+Each scan searches for attributable customer-pain evidence, groups sources into workflow leads, and preselects the sources for review. Click **Scan another batch** to rotate to different workflow hypotheses.
+
+**Search a topic** is the optional manual mode for users who already have a market, workflow, or problem. Automated and manual results can come from:
 
 - Public forums and communities
 - GitHub issue trackers
@@ -274,7 +280,7 @@ Live databases begin empty. Configure OpenAI, submit evidence through **Discover
 
 Open **Settings** and inspect the readiness badges:
 
-- Web search requires Tavily (or Demo mode); extracting selected results requires extraction and embeddings.
+- Opportunity scouting and topic search require Tavily (or Demo mode); extracting selected results requires extraction and embeddings.
 - Paste and CSV ingestion require extraction and embeddings.
 - Competitor research requires extraction and search.
 - Reddit collection additionally requires Reddit OAuth.
