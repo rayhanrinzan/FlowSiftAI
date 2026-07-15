@@ -269,10 +269,16 @@ class ResearchService:
             persisted.append(stored)
 
         if failed_queries < len(query_records):
-            self.competitors.delete_stale_for_cluster(
-                cluster_id,
-                keep_ids={item.id for item in persisted},
-            )
+            keep_ids = {item.id for item in persisted}
+            for competitor in self.competitors.list_for_cluster(cluster_id):
+                if competitor.id in keep_ids:
+                    continue
+                if (competitor.source_evidence or {}).get(
+                    "user_corrected_relationship", False
+                ):
+                    continue
+                self.session.delete(competitor)
+            self.session.commit()
             self.session.expire_all()
 
         run_error = permanent_error
